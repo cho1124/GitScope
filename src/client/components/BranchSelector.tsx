@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { api } from '../api'
+import { useToast } from './Toast'
 
 interface Props {
   currentBranch: string
@@ -10,6 +11,7 @@ interface Props {
 type Mode = null | 'create' | 'merge' | 'delete'
 
 export function BranchSelector({ currentBranch, onBranchChanged, refreshKey }: Props) {
+  const toast = useToast()
   const [branches, setBranches] = useState<string[]>([])
   const [open, setOpen] = useState(false)
   const [loading, setLoading] = useState(false)
@@ -54,7 +56,7 @@ export function BranchSelector({ currentBranch, onBranchChanged, refreshKey }: P
     if (result.ok) {
       onBranchChanged(branch)
     } else {
-      alert(result.error)
+      toast.error(result.error)
     }
   }
 
@@ -70,7 +72,7 @@ export function BranchSelector({ currentBranch, onBranchChanged, refreshKey }: P
       await loadBranches()
       if (checkoutAfterCreate) onBranchChanged(name)
     } else {
-      alert(result.error)
+      toast.error(result.error)
     }
   }
 
@@ -84,7 +86,7 @@ export function BranchSelector({ currentBranch, onBranchChanged, refreshKey }: P
       setTargetBranch('')
       onBranchChanged(currentBranch)
     } else {
-      alert(result.error)
+      toast.error(result.error)
     }
   }
 
@@ -99,7 +101,7 @@ export function BranchSelector({ currentBranch, onBranchChanged, refreshKey }: P
       setTargetBranch('')
       await loadBranches()
     } else {
-      alert(result.error)
+      toast.error(result.error)
     }
   }
 

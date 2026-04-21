@@ -1,35 +1,96 @@
-import { useState, useEffect } from 'react'
-import { api } from '../api'
+import { useState, useEffect, type ReactNode } from 'react'
+import { api, type HeatmapEntry, type HotspotEntry, type TrendBucket, type ContributorInfo } from '../api'
 import { HeatmapCard } from './forensics/HeatmapCard'
 import { HotspotCard } from './forensics/HotspotCard'
 import { TrendChart } from './forensics/TrendChart'
 import { ContributorCard } from './forensics/ContributorCard'
+import { useToast } from './Toast'
+
+type AsyncState<T> =
+  | { status: 'idle' }
+  | { status: 'loading' }
+  | { status: 'ready'; data: T }
+  | { status: 'error'; error: string }
+
+function CardWrapper({ title, state, children, onRetry, fullWidth }: {
+  title: string
+  state: AsyncState<unknown>
+  children: ReactNode
+  onRetry?: () => void
+  fullWidth?: boolean
+}) {
+  if (state.status === 'loading') {
+    return (
+      <div className={`forensics-card ${fullWidth ? 'full-width' : ''}`}>
+        <h3>{title}</h3>
+        <div className="loading" style={{ padding: '16px' }}>
+          <span className="spinner" /> 로딩 중...
+        </div>
+      </div>
+    )
+  }
+  if (state.status === 'error') {
+    return (
+      <div className={`forensics-card ${fullWidth ? 'full-width' : ''}`}>
+        <h3>{title}</h3>
+        <div style={{ padding: '16px', fontSize: '12px', color: 'var(--red)' }}>
+          오류: {state.error}
+          {onRetry && (
+            <button className="btn btn-sm" onClick={onRetry} style={{ marginLeft: '8px' }}>
+              재시도
+            </button>
+          )}
+        </div>
+      </div>
+    )
+  }
+  return <>{children}</>
+}
 
 export function ForensicsDashboard() {
-  const [heatmap, setHeatmap] = useState<any[]>([])
-  const [hotspots, setHotspots] = useState<any[]>([])
-  const [trend, setTrend] = useState<any[]>([])
-  const [contributors, setContributors] = useState<any[]>([])
-  const [loading, setLoading] = useState(true)
+  const toast = useToast()
   const [days, setDays] = useState(90)
+  const [heatmapState, setHeatmapState] = useState<AsyncState<HeatmapEntry[]>>({ status: 'idle' })
+  const [hotspotState, setHotspotState] = useState<AsyncState<HotspotEntry[]>>({ status: 'idle' })
+  const [trendState, setTrendState] = useState<AsyncState<TrendBucket[]>>({ status: 'idle' })
+  const [contributorState, setContributorState] = useState<AsyncState<ContributorInfo[]>>({ status: 'idle' })
 
+  const loadHeatmap = async (d: number) => {
+    setHeatmapState({ status: 'loading' })
+    const r = await api.getHeatmap({ days: d })
+    setHeatmapState(r.ok ? { status: 'ready', data: r.data } : { status: 'error', error: r.error })
+  }
+
+  const loadHotspots = async () => {
+    setHotspotState({ status: 'loading' })
+    const r = await api.getHotspots({ limit: 15 })
+    setHotspotState(r.ok ? { status: 'ready', data: r.data } : { status: 'error', error: r.error })
+  }
+
+  const loadTrend = async () => {
+    setTrendState({ status: 'loading' })
+    const r = await api.getTrend({ days: 180, buckets: 12 })
+    setTrendState(r.ok ? { status: 'ready', data: r.data } : { status: 'error', error: r.error })
+  }
+
+  const loadContributors = async () => {
+    setContributorState({ status: 'loading' })
+    const r = await api.getContributors()
+    if (r.ok) {
+      setContributorState({ status: 'ready', data: r.data })
+    } else {
+      setContributorState({ status: 'error', error: r.error })
+      toast.error(`기여자 분석 실패: ${r.error}`)
+    }
+  }
+
+  // 메인 3종은 mount + days 변경 시 자동 로드 (각자 독립)
   useEffect(() => {
-    setLoading(true)
-    Promise.all([
-      api.getHeatmap({ days }),
-      api.getHotspots({ limit: 15 }),
-      api.getTrend({ days: 180, buckets: 12 }),
-      api.getContributors()
-    ]).then(([hm, hs, tr, ct]) => {
-      if (hm.ok) setHeatmap(hm.data)
-      if (hs.ok) setHotspots(hs.data)
-      if (tr.ok) setTrend(tr.data)
-      if (ct.ok) setContributors(ct.data)
-      setLoading(false)
-    })
+    loadHeatmap(days)
+    loadHotspots()
+    loadTrend()
+    // 긴 시간 걸릴 수 있는 Contributors는 lazy — 사용자가 버튼 클릭
   }, [days])
-
-  if (loading) return <div className="loading"><span className="spinner" /> Forensics 분석 중...</div>
 
   return (
     <div>
@@ -49,11 +110,39 @@ export function ForensicsDashboard() {
           <option value={365}>최근 1년</option>
         </select>
       </div>
+
       <div className="forensics-grid">
-        <TrendChart data={trend} />
-        <HotspotCard hotspots={hotspots} />
-        <HeatmapCard data={heatmap} />
-        <ContributorCard contributors={contributors} />
+        {/* Trend */}
+        <CardWrapper title="📈 변경 트렌드" state={trendState} onRetry={loadTrend} fullWidth>
+          {trendState.status === 'ready' && <TrendChart data={trendState.data} />}
+        </CardWrapper>
+
+        {/* Hotspots */}
+        <CardWrapper title="🔥 핫스팟" state={hotspotState} onRetry={loadHotspots}>
+          {hotspotState.status === 'ready' && <HotspotCard hotspots={hotspotState.data} />}
+        </CardWrapper>
+
+        {/* Heatmap */}
+        <CardWrapper title="🗺️ 변경 빈도 히트맵" state={heatmapState} onRetry={() => loadHeatmap(days)} fullWidth>
+          {heatmapState.status === 'ready' && <HeatmapCard data={heatmapState.data} />}
+        </CardWrapper>
+
+        {/* Contributors — lazy load */}
+        {contributorState.status === 'idle' ? (
+          <div className="forensics-card">
+            <h3>👥 기여자 분석</h3>
+            <div style={{ padding: '16px', fontSize: '11px', color: 'var(--text-muted)' }}>
+              큰 레포에서는 시간이 걸릴 수 있어 수동 로드로 분리했습니다.
+            </div>
+            <button className="btn btn-primary btn-sm" onClick={loadContributors} style={{ width: '100%' }}>
+              기여자 분석 로드
+            </button>
+          </div>
+        ) : (
+          <CardWrapper title="👥 기여자 분석" state={contributorState} onRetry={loadContributors}>
+            {contributorState.status === 'ready' && <ContributorCard contributors={contributorState.data} />}
+          </CardWrapper>
+        )}
       </div>
     </div>
   )

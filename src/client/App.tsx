@@ -10,10 +10,12 @@ import { FileHistory } from './components/FileHistory'
 import { BranchSelector } from './components/BranchSelector'
 import { WelcomeScreen } from './components/WelcomeScreen'
 import { StashPanel } from './components/StashPanel'
+import { useToast } from './components/Toast'
 
 type Tab = 'commits' | 'changes' | 'stash' | 'forensics'
 
 export default function App() {
+  const toast = useToast()
   const [repo, setRepo] = useState<RepoInfo | null>(null)
   const [activeTab, setActiveTab] = useState<Tab>('commits')
   const [selectedCommit, setSelectedCommit] = useState<string | null>(null)
@@ -36,9 +38,9 @@ export default function App() {
       setSelectedFile(null)
       setRefreshKey(k => k + 1)
     } else {
-      alert(result.error)
+      toast.error(result.error)
     }
-  }, [])
+  }, [toast])
 
   const handleSelectCommit = useCallback(async (hash: string) => {
     setSelectedCommit(hash)
@@ -108,7 +110,15 @@ export default function App() {
           </div>
           <div className="sidebar-content">
             {showFileHistory && selectedFile ? (
-              <FileHistory key={`fh-${refreshKey}`} filePath={selectedFile} />
+              <FileHistory
+                key={`fh-${refreshKey}`}
+                filePath={selectedFile}
+                selectedCommit={selectedCommit}
+                onSelectCommit={(hash) => {
+                  setActiveTab('commits')
+                  handleSelectCommit(hash)
+                }}
+              />
             ) : (
               <FileTree
                 key={`ft-${refreshKey}`}
@@ -182,7 +192,7 @@ export default function App() {
         </div>
       </div>
 
-      <StatusBar key={`sb-${refreshKey}`} branch={repo.currentBranch} />
+      <StatusBar branch={repo.currentBranch} refreshKey={refreshKey} />
     </div>
   )
 }

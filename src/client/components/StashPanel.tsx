@@ -1,12 +1,14 @@
 import { useState, useEffect, useCallback } from 'react'
 import { api, type StashEntry } from '../api'
 import { DiffView } from './DiffView'
+import { useToast } from './Toast'
 
 interface Props {
   onStashChanged?: () => void
 }
 
 export function StashPanel({ onStashChanged }: Props) {
+  const toast = useToast()
   const [stashes, setStashes] = useState<StashEntry[]>([])
   const [loading, setLoading] = useState(true)
   const [busy, setBusy] = useState(false)
@@ -45,7 +47,7 @@ export function StashPanel({ onStashChanged }: Props) {
       await loadStashes()
       onStashChanged?.()
     } else {
-      alert(result.error)
+      toast.error(result.error)
     }
   }
 
@@ -61,7 +63,7 @@ export function StashPanel({ onStashChanged }: Props) {
       await loadStashes()
       onStashChanged?.()
     } else {
-      alert(result.error)
+      toast.error(result.error)
     }
   }
 
@@ -78,7 +80,7 @@ export function StashPanel({ onStashChanged }: Props) {
       await loadStashes()
       onStashChanged?.()
     } else {
-      alert(result.error)
+      toast.error(result.error)
     }
   }
 

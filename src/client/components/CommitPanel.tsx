@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { api, type StatusInfo } from '../api'
 import { DiffView } from './DiffView'
+import { useToast } from './Toast'
 
 interface Props {
   onCommitDone: () => void
@@ -9,6 +10,7 @@ interface Props {
 type SelectedFile = { path: string; staged: boolean } | null
 
 export function CommitPanel({ onCommitDone }: Props) {
+  const toast = useToast()
   const [status, setStatus] = useState<StatusInfo | null>(null)
   const [message, setMessage] = useState('')
   const [loading, setLoading] = useState(true)
@@ -67,20 +69,22 @@ export function CommitPanel({ onCommitDone }: Props) {
       setSelected(null)
       onCommitDone()
       await loadStatus()
+      toast.success('커밋 완료')
     } else {
-      alert(result.error)
+      toast.error(result.error)
     }
   }
 
   const handlePush = async () => {
     const result = await api.push()
-    if (!result.ok) alert(result.error)
+    if (result.ok) toast.success('Push 완료')
+    else toast.error(result.error)
   }
 
   const handlePull = async () => {
     const result = await api.pull()
-    if (result.ok) { onCommitDone(); await loadStatus() }
-    else alert(result.error)
+    if (result.ok) { onCommitDone(); await loadStatus(); toast.success('Pull 완료') }
+    else toast.error(result.error)
   }
 
   if (loading) return <div className="loading"><span className="spinner" /> 상태 로딩 중...</div>

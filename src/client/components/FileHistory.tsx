@@ -1,17 +1,13 @@
 import { useState, useEffect } from 'react'
-import { api } from '../api'
+import { api, type CommitInfo } from '../api'
 
-interface CommitInfo {
-  hash: string
-  hashShort: string
-  message: string
-  author: string
-  date: string
+interface Props {
+  filePath: string
+  selectedCommit?: string | null
+  onSelectCommit?: (hash: string) => void
 }
 
-interface Props { filePath: string }
-
-export function FileHistory({ filePath }: Props) {
+export function FileHistory({ filePath, selectedCommit, onSelectCommit }: Props) {
   const [commits, setCommits] = useState<CommitInfo[]>([])
   const [loading, setLoading] = useState(true)
 
@@ -37,11 +33,20 @@ export function FileHistory({ filePath }: Props) {
         fontFamily: 'var(--font-mono)', borderBottom: '1px solid var(--border)', background: 'var(--bg-surface)'
       }}>{filePath}</div>
       <div style={{ fontSize: '11px', color: 'var(--text-muted)', padding: '8px 12px' }}>총 {commits.length}개 커밋</div>
-      {commits.map((commit, i) => (
-        <div key={commit.hash} style={{
-          display: 'flex', gap: '8px', padding: '6px 12px',
-          borderBottom: '1px solid var(--border)', cursor: 'pointer'
-        }} className="file-tree-item">
+      {commits.map((commit, i) => {
+        const isSelected = selectedCommit === commit.hash
+        return (
+        <div
+          key={commit.hash}
+          onClick={() => onSelectCommit?.(commit.hash)}
+          style={{
+            display: 'flex', gap: '8px', padding: '6px 12px',
+            borderBottom: '1px solid var(--border)', cursor: 'pointer',
+            background: isSelected ? 'var(--bg-surface)' : 'transparent',
+            borderLeft: isSelected ? '3px solid var(--accent)' : '3px solid transparent'
+          }}
+          className="file-tree-item"
+        >
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', width: '16px' }}>
             <div style={{
               width: '8px', height: '8px', borderRadius: '50%',
@@ -62,7 +67,8 @@ export function FileHistory({ filePath }: Props) {
             </div>
           </div>
         </div>
-      ))}
+        )
+      })}
       {commits.length === 0 && (
         <div style={{ fontSize: '12px', color: 'var(--text-muted)', padding: '16px' }}>히스토리가 없습니다</div>
       )}

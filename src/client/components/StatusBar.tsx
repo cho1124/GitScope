@@ -1,13 +1,22 @@
 import { useState, useEffect } from 'react'
 import { api } from '../api'
 
-interface Props { branch: string }
+interface Props {
+  branch: string
+  refreshKey?: number
+}
 
-export function StatusBar({ branch }: Props) {
+const POLL_INTERVAL = 5000 // 5s
+
+export function StatusBar({ branch, refreshKey }: Props) {
   const [changeCount, setChangeCount] = useState(0)
 
   useEffect(() => {
-    api.getStatus().then(result => {
+    let cancelled = false
+
+    const fetchStatus = async () => {
+      const result = await api.getStatus()
+      if (cancelled) return
       if (result.ok) {
         const s = result.data
         setChangeCount(
@@ -15,8 +24,15 @@ export function StatusBar({ branch }: Props) {
           (s.deleted?.length || 0) + (s.staged?.length || 0)
         )
       }
-    })
-  }, [])
+    }
+
+    fetchStatus()
+    const id = setInterval(fetchStatus, POLL_INTERVAL)
+    return () => {
+      cancelled = true
+      clearInterval(id)
+    }
+  }, [refreshKey])
 
   return (
     <div className="status-bar">
