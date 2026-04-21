@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
+import { GitBranch, ChevronDown, Plus, GitMerge, Trash2, Check } from 'lucide-react'
 import { api } from '../api'
 import { useToast } from './Toast'
 import { useConfirm } from './ConfirmModal'
@@ -122,11 +123,11 @@ export function BranchSelector({ currentBranch, onBranchChanged, refreshKey }: P
         title="브랜치 전환"
         style={{ fontFamily: 'var(--font-mono)', minWidth: '120px', justifyContent: 'flex-start' }}
       >
-        <span style={{ color: 'var(--mauve)' }}>⎇</span>
+        <GitBranch size={12} color="var(--mauve)" />
         <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
           {currentBranch}
         </span>
-        <span style={{ marginLeft: 'auto', color: 'var(--text-muted)' }}>▾</span>
+        <ChevronDown size={12} color="var(--text-muted)" style={{ marginLeft: 'auto' }} />
       </button>
 
       {open && (
@@ -183,8 +184,8 @@ export function BranchSelector({ currentBranch, onBranchChanged, refreshKey }: P
                 if (b !== currentBranch) e.currentTarget.style.background = 'transparent'
               }}
             >
-              <span style={{ width: '12px', color: 'var(--accent)' }}>
-                {b === currentBranch ? '●' : ''}
+              <span style={{ width: '12px', color: 'var(--accent)', display: 'inline-flex', alignItems: 'center' }}>
+                {b === currentBranch ? <Check size={12} strokeWidth={3} /> : null}
               </span>
               <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis' }}>
                 {b}
@@ -202,14 +203,14 @@ export function BranchSelector({ currentBranch, onBranchChanged, refreshKey }: P
           }}>
             <button
               className="btn btn-sm"
-              style={{ flex: 1, fontSize: '10px' }}
+              style={{ flex: 1, fontSize: '10px', gap: 4 }}
               onClick={() => { setMode('create'); setInputName('') }}
             >
-              + 새 브랜치
+              <Plus size={11} /> 새 브랜치
             </button>
             <button
               className="btn btn-sm"
-              style={{ flex: 1, fontSize: '10px' }}
+              style={{ flex: 1, fontSize: '10px', gap: 4 }}
               onClick={() => {
                 setMode('merge')
                 const other = branches.find(b => b !== currentBranch) || ''
@@ -217,11 +218,11 @@ export function BranchSelector({ currentBranch, onBranchChanged, refreshKey }: P
               }}
               disabled={branches.length < 2}
             >
-              Merge
+              <GitMerge size={11} /> Merge
             </button>
             <button
               className="btn btn-sm"
-              style={{ flex: 1, fontSize: '10px' }}
+              style={{ flex: 1, fontSize: '10px', gap: 4 }}
               onClick={() => {
                 setMode('delete')
                 const other = branches.find(b => b !== currentBranch) || ''
@@ -229,7 +230,7 @@ export function BranchSelector({ currentBranch, onBranchChanged, refreshKey }: P
               }}
               disabled={branches.length < 2}
             >
-              Delete
+              <Trash2 size={11} /> Delete
             </button>
           </div>
 

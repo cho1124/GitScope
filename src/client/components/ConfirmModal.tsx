@@ -1,4 +1,5 @@
 import { useEffect, useState, useCallback, createContext, useContext, type ReactNode } from 'react'
+import { AlertTriangle, Info } from 'lucide-react'
 
 type Variant = 'danger' | 'warn' | 'info'
 
@@ -73,10 +74,7 @@ function ConfirmDialog({ opts, onResolve }: { opts: ConfirmOptions; onResolve: (
     variant === 'danger' ? 'var(--red)' :
     variant === 'warn' ? 'var(--yellow)' :
     'var(--accent)'
-  const icon =
-    variant === 'danger' ? '⚠' :
-    variant === 'warn' ? '⚠' :
-    'ⓘ'
+  const Icon = variant === 'info' ? Info : AlertTriangle
 
   return (
     <div
@@ -117,7 +115,7 @@ function ConfirmDialog({ opts, onResolve }: { opts: ConfirmOptions; onResolve: (
           gap: '10px',
           marginBottom: '10px'
         }}>
-          <span style={{ color: accent, fontSize: '16px', fontWeight: 700 }}>{icon}</span>
+          <Icon size={16} strokeWidth={2.5} color={accent} style={{ flexShrink: 0 }} />
           <h3 id="confirm-title" style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)' }}>
             {opts.title ?? '확인'}
           </h3>

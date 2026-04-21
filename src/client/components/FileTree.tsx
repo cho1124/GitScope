@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
+import { Folder, FolderOpen, FileText } from 'lucide-react'
 import { api, type FileTreeNode } from '../api'
 
 interface Props {
@@ -75,8 +76,8 @@ export function FileTree({ onSelectFile, selectedFile }: Props) {
             else onSelectFile(node.path)
           }}
         >
-          <span className="icon">
-            {isDir ? (isExpanded ? '\u{1F4C2}' : '\u{1F4C1}') : '\u{1F4C4}'}
+          <span className="icon" style={{ display: 'inline-flex', alignItems: 'center', color: isDir ? 'var(--peach)' : 'var(--text-muted)' }}>
+            {isDir ? (isExpanded ? <FolderOpen size={14} /> : <Folder size={14} />) : <FileText size={14} />}
           </span>
           <span className="name">{node.name}</span>
           {isLoading && (

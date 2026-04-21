@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
+import { Tag } from 'lucide-react'
 import { api, type CommitInfo } from '../api'
 
 interface Props {
@@ -169,8 +170,8 @@ export function CommitLog({ selectedCommit, onSelectCommit, file }: Props) {
                   </span>
                 ))}
                 {parsed.tags.map(t => (
-                  <span key={`t-${t}`} style={{ ...pillStyle, background: 'rgba(249, 226, 175, 0.15)', color: 'var(--yellow)' }}>
-                    🏷 {t}
+                  <span key={`t-${t}`} style={{ ...pillStyle, background: 'rgba(249, 226, 175, 0.15)', color: 'var(--yellow)', display: 'inline-flex', alignItems: 'center', gap: 3 }}>
+                    <Tag size={9} strokeWidth={2.5} /> {t}
                   </span>
                 ))}
                 {commit.message}

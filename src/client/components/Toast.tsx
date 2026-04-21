@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, createContext, useContext, type ReactNode } from 'react'
+import { Info, CheckCircle2, XCircle, AlertTriangle, X } from 'lucide-react'
 
 type ToastKind = 'info' | 'success' | 'error' | 'warn'
 
@@ -69,13 +70,14 @@ function ToastView({ item, onDismiss }: { item: ToastItem; onDismiss: () => void
     return () => clearTimeout(t)
   }, [])
 
-  const colorMap: Record<ToastKind, { bg: string; border: string; accent: string; icon: string }> = {
-    info: { bg: 'var(--bg-secondary)', border: 'var(--accent)', accent: 'var(--accent)', icon: 'ⓘ' },
-    success: { bg: 'var(--bg-secondary)', border: 'var(--green)', accent: 'var(--green)', icon: '✓' },
-    error: { bg: 'var(--bg-secondary)', border: 'var(--red)', accent: 'var(--red)', icon: '✕' },
-    warn: { bg: 'var(--bg-secondary)', border: 'var(--yellow)', accent: 'var(--yellow)', icon: '⚠' },
+  const colorMap: Record<ToastKind, { border: string; accent: string; Icon: typeof Info }> = {
+    info: { border: 'var(--accent)', accent: 'var(--accent)', Icon: Info },
+    success: { border: 'var(--green)', accent: 'var(--green)', Icon: CheckCircle2 },
+    error: { border: 'var(--red)', accent: 'var(--red)', Icon: XCircle },
+    warn: { border: 'var(--yellow)', accent: 'var(--yellow)', Icon: AlertTriangle },
   }
   const c = colorMap[item.kind]
+  const Icon = c.Icon
 
   return (
     <div
@@ -84,7 +86,7 @@ function ToastView({ item, onDismiss }: { item: ToastItem; onDismiss: () => void
         alignItems: 'flex-start',
         gap: '10px',
         padding: '10px 14px',
-        background: c.bg,
+        background: 'var(--bg-secondary)',
         border: `1px solid ${c.border}`,
         borderLeft: `4px solid ${c.accent}`,
         borderRadius: 'var(--radius)',
@@ -98,7 +100,7 @@ function ToastView({ item, onDismiss }: { item: ToastItem; onDismiss: () => void
         transition: 'transform 0.18s ease-out, opacity 0.18s ease-out'
       }}
     >
-      <span style={{ color: c.accent, fontWeight: 700 }}>{c.icon}</span>
+      <Icon size={14} strokeWidth={2.5} color={c.accent} style={{ flexShrink: 0, marginTop: 1 }} />
       <div style={{ flex: 1, whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>{item.message}</div>
       <button
         onClick={onDismiss}
@@ -108,12 +110,12 @@ function ToastView({ item, onDismiss }: { item: ToastItem; onDismiss: () => void
           color: 'var(--text-muted)',
           cursor: 'pointer',
           padding: '0 2px',
-          fontSize: '13px',
-          lineHeight: 1
+          display: 'flex',
+          alignItems: 'center'
         }}
         aria-label="닫기"
       >
-        ×
+        <X size={14} />
       </button>
     </div>
   )

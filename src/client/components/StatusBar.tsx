@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { GitBranch, Circle } from 'lucide-react'
 import { api } from '../api'
 
 interface Props {
@@ -36,8 +37,14 @@ export function StatusBar({ branch, refreshKey }: Props) {
 
   return (
     <div className="status-bar">
-      <span className="branch">&#x23e3; {branch}</span>
-      {changeCount > 0 && <span className="changes">● {changeCount}개 변경</span>}
+      <span className="branch" style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+        <GitBranch size={11} /> {branch}
+      </span>
+      {changeCount > 0 && (
+        <span className="changes" style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+          <Circle size={8} fill="currentColor" strokeWidth={0} /> {changeCount}개 변경
+        </span>
+      )}
       <div style={{ flex: 1 }} />
       <span>GitScope v0.1.0</span>
     </div>

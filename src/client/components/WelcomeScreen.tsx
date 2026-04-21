@@ -1,5 +1,6 @@
 import { useEffect, useState, useCallback } from 'react'
 import { open as openDialog } from '@tauri-apps/plugin-dialog'
+import { FolderOpen, Folder, X } from 'lucide-react'
 import { api, type RecentRepo } from '../api'
 
 interface Props {
@@ -66,7 +67,8 @@ export function WelcomeScreen({ onOpen, opening }: Props) {
           disabled={opening}
           style={{ fontSize: '13px', padding: '8px 16px' }}
         >
-          {opening ? '여는 중...' : '📁 폴더 선택'}
+          <FolderOpen size={14} style={{ marginRight: 2 }} />
+          {opening ? '여는 중...' : '폴더 선택'}
         </button>
         <span style={{ color: 'var(--text-muted)', fontSize: '11px' }}>또는 경로 직접 입력</span>
       </div>
@@ -147,7 +149,7 @@ export function WelcomeScreen({ onOpen, opening }: Props) {
                   e.currentTarget.style.background = 'transparent'
                 }}
               >
-                <span style={{ fontSize: '16px' }}>📂</span>
+                <Folder size={18} color="var(--peach)" style={{ flexShrink: 0 }} />
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ fontSize: '13px', fontWeight: 500 }}>{r.name}</div>
                   <div style={{
@@ -166,11 +168,12 @@ export function WelcomeScreen({ onOpen, opening }: Props) {
                 </div>
                 <button
                   className="btn btn-sm"
-                  style={{ fontSize: '9px', padding: '2px 6px' }}
+                  style={{ padding: '4px 6px', display: 'flex', alignItems: 'center' }}
                   onClick={e => { e.stopPropagation(); handleRemove(r.path) }}
                   title="목록에서 제거"
+                  aria-label={`${r.name} 제거`}
                 >
-                  ×
+                  <X size={12} />
                 </button>
               </div>
             ))}
