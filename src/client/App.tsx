@@ -9,8 +9,9 @@ import { CommitPanel } from './components/CommitPanel'
 import { FileHistory } from './components/FileHistory'
 import { BranchSelector } from './components/BranchSelector'
 import { WelcomeScreen } from './components/WelcomeScreen'
+import { StashPanel } from './components/StashPanel'
 
-type Tab = 'commits' | 'forensics' | 'changes'
+type Tab = 'commits' | 'changes' | 'stash' | 'forensics'
 
 export default function App() {
   const [repo, setRepo] = useState<RepoInfo | null>(null)
@@ -134,6 +135,12 @@ export default function App() {
               변경사항
             </button>
             <button
+              className={`content-tab ${activeTab === 'stash' ? 'active' : ''}`}
+              onClick={() => setActiveTab('stash')}
+            >
+              Stash
+            </button>
+            <button
               className={`content-tab ${activeTab === 'forensics' ? 'active' : ''}`}
               onClick={() => setActiveTab('forensics')}
             >
@@ -162,6 +169,10 @@ export default function App() {
 
             {activeTab === 'changes' && (
               <CommitPanel key={`cp-${refreshKey}`} onCommitDone={handleRefresh} />
+            )}
+
+            {activeTab === 'stash' && (
+              <StashPanel key={`st-${refreshKey}`} onStashChanged={handleRefresh} />
             )}
 
             {activeTab === 'forensics' && (

@@ -1,19 +1,47 @@
 import { useState, useEffect } from 'react'
-import { api } from '../api'
-
-interface CommitInfo {
-  hash: string
-  hashShort: string
-  message: string
-  author: string
-  date: string
-  refs: string
-}
+import { api, type CommitInfo } from '../api'
 
 interface Props {
   selectedCommit: string | null
   onSelectCommit: (hash: string) => void
   file?: string | null
+}
+
+interface ParsedRefs {
+  head: boolean
+  branches: string[]
+  remotes: string[]
+  tags: string[]
+}
+
+function parseRefs(refs: string): ParsedRefs {
+  const result: ParsedRefs = { head: false, branches: [], remotes: [], tags: [] }
+  if (!refs) return result
+  for (const raw of refs.split(',').map(s => s.trim()).filter(Boolean)) {
+    if (raw.startsWith('HEAD -> ')) {
+      result.head = true
+      result.branches.push(raw.slice('HEAD -> '.length))
+    } else if (raw === 'HEAD') {
+      result.head = true
+    } else if (raw.startsWith('tag: ')) {
+      result.tags.push(raw.slice('tag: '.length))
+    } else if (raw.includes('/')) {
+      result.remotes.push(raw)
+    } else {
+      result.branches.push(raw)
+    }
+  }
+  return result
+}
+
+const pillStyle: React.CSSProperties = {
+  padding: '1px 6px',
+  borderRadius: '3px',
+  fontSize: '10px',
+  marginRight: '4px',
+  fontFamily: 'var(--font-mono)',
+  display: 'inline-block',
+  whiteSpace: 'nowrap'
 }
 
 export function CommitLog({ selectedCommit, onSelectCommit, file }: Props) {
@@ -46,25 +74,42 @@ export function CommitLog({ selectedCommit, onSelectCommit, file }: Props) {
 
   return (
     <ul className="commit-list">
-      {commits.map(commit => (
-        <li
-          key={commit.hash}
-          className={`commit-item ${selectedCommit === commit.hash ? 'selected' : ''}`}
-          onClick={() => onSelectCommit(commit.hash)}
-        >
-          <span className="commit-hash">{commit.hashShort}</span>
-          <span className="commit-message">
-            {commit.refs && (
-              <span style={{
-                background: 'var(--bg-hover)', padding: '1px 6px',
-                borderRadius: '3px', fontSize: '10px', marginRight: '6px', color: 'var(--mauve)'
-              }}>{commit.refs}</span>
-            )}
-            {commit.message}
-          </span>
-          <span className="commit-meta">{commit.author} · {formatDate(commit.date)}</span>
-        </li>
-      ))}
+      {commits.map(commit => {
+        const parsed = parseRefs(commit.refs)
+        return (
+          <li
+            key={commit.hash}
+            className={`commit-item ${selectedCommit === commit.hash ? 'selected' : ''}`}
+            onClick={() => onSelectCommit(commit.hash)}
+          >
+            <span className="commit-hash">{commit.hashShort}</span>
+            <span className="commit-message">
+              {parsed.head && (
+                <span style={{ ...pillStyle, background: 'var(--accent)', color: 'var(--bg-primary)' }}>
+                  HEAD
+                </span>
+              )}
+              {parsed.branches.map(b => (
+                <span key={`b-${b}`} style={{ ...pillStyle, background: 'var(--bg-hover)', color: 'var(--mauve)' }}>
+                  {b}
+                </span>
+              ))}
+              {parsed.remotes.map(r => (
+                <span key={`r-${r}`} style={{ ...pillStyle, background: 'var(--bg-surface)', color: 'var(--text-muted)' }}>
+                  {r}
+                </span>
+              ))}
+              {parsed.tags.map(t => (
+                <span key={`t-${t}`} style={{ ...pillStyle, background: 'rgba(249, 226, 175, 0.15)', color: 'var(--yellow)' }}>
+                  🏷 {t}
+                </span>
+              ))}
+              {commit.message}
+            </span>
+            <span className="commit-meta">{commit.author} · {formatDate(commit.date)}</span>
+          </li>
+        )
+      })}
     </ul>
   )
 }

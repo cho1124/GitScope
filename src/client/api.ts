@@ -102,6 +102,13 @@ export interface RecentRepo {
   lastOpened: string
 }
 
+export interface StashEntry {
+  index: number
+  refName: string
+  branch: string
+  message: string
+}
+
 // ───── API ──────────────────────────────────────────────
 
 export const api = {
@@ -161,4 +168,22 @@ export const api = {
     call<TrendBucket[]>('get_trend', { days: opts?.days ?? 180, buckets: opts?.buckets ?? 12 }),
 
   getContributors: () => call<ContributorInfo[]>('get_contributors'),
+
+  // ── Stash ────────────────────────────────────────────
+  stashList: () => call<StashEntry[]>('stash_list'),
+
+  stashSave: (message?: string, includeUntracked?: boolean) =>
+    call<void>('stash_save', {
+      message: message ?? null,
+      includeUntracked: includeUntracked ?? false,
+    }),
+
+  stashApply: (refName: string) => call<void>('stash_apply', { refName }),
+  stashPop: (refName: string) => call<void>('stash_pop', { refName }),
+  stashDrop: (refName: string) => call<void>('stash_drop', { refName }),
+  stashShow: (refName: string) => call<string>('stash_show', { refName }),
+
+  // ── Working tree diff ────────────────────────────────
+  getUnstagedDiff: (file: string) => call<string>('get_unstaged_diff', { file }),
+  getStagedDiff: (file: string) => call<string>('get_staged_diff', { file }),
 }

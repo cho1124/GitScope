@@ -1,6 +1,7 @@
 mod forensics;
 mod git;
 mod recent;
+mod stash;
 
 use std::path::PathBuf;
 use std::sync::Mutex;
@@ -52,6 +53,14 @@ pub fn run() {
             recent::get_recent_repos,
             recent::remove_recent_repo,
             recent::clear_recent_repos,
+            stash::stash_list,
+            stash::stash_save,
+            stash::stash_apply,
+            stash::stash_pop,
+            stash::stash_drop,
+            stash::stash_show,
+            stash::get_unstaged_diff,
+            stash::get_staged_diff,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
