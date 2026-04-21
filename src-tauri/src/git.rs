@@ -156,11 +156,18 @@ pub fn open_repo(path: String, state: State<AppState>) -> Result<RepoInfo, Strin
     });
 
     let display_path = strip_long_path_prefix(&canonical.to_string_lossy());
+    let repo_name = canonical
+        .file_name()
+        .map(|s| s.to_string_lossy().to_string())
+        .unwrap_or_else(|| display_path.clone());
     let info = RepoInfo {
-        path: display_path,
+        path: display_path.clone(),
         current_branch,
         last_commit,
     };
+
+    // 최근 레포 기록
+    let _ = crate::recent::touch_recent(&display_path, &repo_name);
 
     {
         let mut guard = state.repo.lock().map_err(|e| e.to_string())?;
@@ -415,18 +422,33 @@ pub fn get_file_history(
 
 #[tauri::command]
 pub fn get_file_tree(state: State<AppState>) -> Result<Vec<FileTreeNode>, String> {
-    with_repo(&state, |path| build_tree(path, "", 0, 5))
+    with_repo(&state, |path| build_tree_shallow(path, ""))
 }
 
-fn build_tree(
-    dir: &PathBuf,
-    rel: &str,
-    depth: usize,
-    max_depth: usize,
+/// lazy loading: expand 시점에 해당 디렉토리만 반환 (재귀 없음)
+#[tauri::command]
+pub fn get_directory_children(
+    rel_path: String,
+    state: State<AppState>,
 ) -> Result<Vec<FileTreeNode>, String> {
-    if depth >= max_depth {
-        return Ok(vec![]);
-    }
+    with_repo(&state, |root| {
+        // relative path 안전성 검증: 루트 내부 경로만 허용
+        let target = root.join(&rel_path);
+        let canonical = target
+            .canonicalize()
+            .map_err(|e| format!("경로 확인 실패: {}", e))?;
+        let root_canonical = root
+            .canonicalize()
+            .map_err(|e| format!("루트 경로 확인 실패: {}", e))?;
+        if !canonical.starts_with(&root_canonical) {
+            return Err("레포 외부 경로입니다".to_string());
+        }
+        build_tree_shallow(&canonical, &rel_path)
+    })
+}
+
+/// 1단계만 읽음 (children은 None) — lazy load 전제
+fn build_tree_shallow(dir: &PathBuf, rel: &str) -> Result<Vec<FileTreeNode>, String> {
     let mut nodes = Vec::new();
 
     let entries = match std::fs::read_dir(dir) {
@@ -447,30 +469,19 @@ fn build_tree(
             Ok(m) => m,
             Err(_) => continue,
         };
-        let full_path = entry.path();
         let rel_path = if rel.is_empty() {
             name.clone()
         } else {
             format!("{}/{}", rel, name)
         };
 
-        if meta.is_dir() {
-            let children =
-                build_tree(&full_path, &rel_path, depth + 1, max_depth).unwrap_or_default();
-            nodes.push(FileTreeNode {
-                name,
-                path: rel_path,
-                node_type: "directory".to_string(),
-                children: Some(children),
-            });
-        } else {
-            nodes.push(FileTreeNode {
-                name,
-                path: rel_path,
-                node_type: "file".to_string(),
-                children: None,
-            });
-        }
+        let node_type = if meta.is_dir() { "directory" } else { "file" };
+        nodes.push(FileTreeNode {
+            name,
+            path: rel_path,
+            node_type: node_type.to_string(),
+            children: None,
+        });
     }
 
     nodes.sort_by(|a, b| {

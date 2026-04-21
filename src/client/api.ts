@@ -96,6 +96,12 @@ export interface ContributorInfo {
   topFiles: { path: string; changes: number }[]
 }
 
+export interface RecentRepo {
+  path: string
+  name: string
+  lastOpened: string
+}
+
 // ───── API ──────────────────────────────────────────────
 
 export const api = {
@@ -133,8 +139,17 @@ export const api = {
 
   getFileTree: () => call<FileTreeNode[]>('get_file_tree'),
 
+  getDirectoryChildren: (relPath: string) =>
+    call<FileTreeNode[]>('get_directory_children', { relPath }),
+
   getFileHistory: (filePath: string) =>
     call<CommitInfo[]>('get_file_history', { filePath }),
+
+  getRecentRepos: () => call<RecentRepo[]>('get_recent_repos'),
+
+  removeRecentRepo: (path: string) => call<void>('remove_recent_repo', { path }),
+
+  clearRecentRepos: () => call<void>('clear_recent_repos'),
 
   getHeatmap: (opts?: { days?: number }) =>
     call<HeatmapEntry[]>('get_heatmap', { days: opts?.days ?? 90 }),

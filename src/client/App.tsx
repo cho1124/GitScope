@@ -8,12 +8,12 @@ import { StatusBar } from './components/StatusBar'
 import { CommitPanel } from './components/CommitPanel'
 import { FileHistory } from './components/FileHistory'
 import { BranchSelector } from './components/BranchSelector'
+import { WelcomeScreen } from './components/WelcomeScreen'
 
 type Tab = 'commits' | 'forensics' | 'changes'
 
 export default function App() {
   const [repo, setRepo] = useState<RepoInfo | null>(null)
-  const [repoInput, setRepoInput] = useState('')
   const [activeTab, setActiveTab] = useState<Tab>('commits')
   const [selectedCommit, setSelectedCommit] = useState<string | null>(null)
   const [selectedFile, setSelectedFile] = useState<string | null>(null)
@@ -22,10 +22,11 @@ export default function App() {
   const [refreshKey, setRefreshKey] = useState(0)
   const [loading, setLoading] = useState(false)
 
-  const handleOpenRepo = useCallback(async () => {
-    if (!repoInput.trim()) return
+  const handleOpenRepo = useCallback(async (path: string) => {
+    const trimmed = path.trim()
+    if (!trimmed) return
     setLoading(true)
-    const result = await api.openRepo(repoInput.trim())
+    const result = await api.openRepo(trimmed)
     setLoading(false)
     if (result.ok) {
       setRepo(result.data)
@@ -36,7 +37,7 @@ export default function App() {
     } else {
       alert(result.error)
     }
-  }, [repoInput])
+  }, [])
 
   const handleSelectCommit = useCallback(async (hash: string) => {
     setSelectedCommit(hash)
@@ -63,28 +64,7 @@ export default function App() {
   if (!repo) {
     return (
       <div className="app-container">
-        <div className="welcome-screen">
-          <h2>GitScope</h2>
-          <p>Code Forensics를 내장한 Git GUI</p>
-          <div style={{ display: 'flex', gap: '8px', marginTop: '8px' }}>
-            <input
-              type="text"
-              value={repoInput}
-              onChange={e => setRepoInput(e.target.value)}
-              onKeyDown={e => e.key === 'Enter' && handleOpenRepo()}
-              placeholder="레포지토리 경로 (예: C:\Users\cho\Desktop\Project\MyRepo)"
-              style={{ width: '500px' }}
-              autoFocus
-            />
-            <button
-              className="btn btn-primary"
-              onClick={handleOpenRepo}
-              disabled={loading}
-            >
-              {loading ? '여는 중...' : '열기'}
-            </button>
-          </div>
-        </div>
+        <WelcomeScreen onOpen={handleOpenRepo} opening={loading} />
       </div>
     )
   }
@@ -100,7 +80,7 @@ export default function App() {
           onBranchChanged={handleBranchChanged}
           refreshKey={refreshKey}
         />
-        <button className="btn btn-sm" onClick={() => { setRepo(null); setRepoInput('') }}>
+        <button className="btn btn-sm" onClick={() => setRepo(null)}>
           다른 레포
         </button>
         <button className="btn btn-sm" onClick={handleRefresh}>

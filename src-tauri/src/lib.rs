@@ -1,5 +1,6 @@
 mod forensics;
 mod git;
+mod recent;
 
 use std::path::PathBuf;
 use std::sync::Mutex;
@@ -16,6 +17,7 @@ pub struct AppState {
 pub fn run() {
     tauri::Builder::default()
         .manage(AppState::default())
+        .plugin(tauri_plugin_dialog::init())
         .setup(|app| {
             if cfg!(debug_assertions) {
                 app.handle().plugin(
@@ -42,10 +44,14 @@ pub fn run() {
             git::pull,
             git::get_file_history,
             git::get_file_tree,
+            git::get_directory_children,
             forensics::get_heatmap,
             forensics::get_hotspots,
             forensics::get_trend,
             forensics::get_contributors,
+            recent::get_recent_repos,
+            recent::remove_recent_repo,
+            recent::clear_recent_repos,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
