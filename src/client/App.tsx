@@ -1,5 +1,5 @@
 import { useState, useCallback } from 'react'
-import { api } from './api'
+import { api, type RepoInfo } from './api'
 import { FileTree } from './components/FileTree'
 import { CommitLog } from './components/CommitLog'
 import { DiffView } from './components/DiffView'
@@ -7,14 +7,9 @@ import { ForensicsDashboard } from './components/ForensicsDashboard'
 import { StatusBar } from './components/StatusBar'
 import { CommitPanel } from './components/CommitPanel'
 import { FileHistory } from './components/FileHistory'
+import { BranchSelector } from './components/BranchSelector'
 
 type Tab = 'commits' | 'forensics' | 'changes'
-
-interface RepoInfo {
-  path: string
-  currentBranch: string
-  lastCommit: { hash: string; message: string; date: string } | null
-}
 
 export default function App() {
   const [repo, setRepo] = useState<RepoInfo | null>(null)
@@ -58,6 +53,13 @@ export default function App() {
     setRefreshKey(k => k + 1)
   }, [])
 
+  const handleBranchChanged = useCallback((newBranch: string) => {
+    setRepo(prev => prev ? { ...prev, currentBranch: newBranch } : prev)
+    setSelectedCommit(null)
+    setDiff('')
+    setRefreshKey(k => k + 1)
+  }, [])
+
   if (!repo) {
     return (
       <div className="app-container">
@@ -79,7 +81,7 @@ export default function App() {
               onClick={handleOpenRepo}
               disabled={loading}
             >
-              {loading ? '열는 중...' : '열기'}
+              {loading ? '여는 중...' : '열기'}
             </button>
           </div>
         </div>
@@ -93,6 +95,11 @@ export default function App() {
         <h1>GitScope</h1>
         <span className="repo-path">{repo.path}</span>
         <div style={{ flex: 1 }} />
+        <BranchSelector
+          currentBranch={repo.currentBranch}
+          onBranchChanged={handleBranchChanged}
+          refreshKey={refreshKey}
+        />
         <button className="btn btn-sm" onClick={() => { setRepo(null); setRepoInput('') }}>
           다른 레포
         </button>

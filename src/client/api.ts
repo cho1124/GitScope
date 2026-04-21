@@ -13,43 +13,137 @@ async function call<T>(cmd: string, args?: Record<string, unknown>): Promise<Api
   }
 }
 
+// ───── Shared types ─────────────────────────────────────
+
+export interface RepoInfo {
+  path: string
+  currentBranch: string
+  lastCommit: { hash: string; message: string; date: string } | null
+}
+
+export interface CommitInfo {
+  hash: string
+  hashShort: string
+  message: string
+  author: string
+  email: string
+  date: string
+  refs: string
+}
+
+export interface StatusInfo {
+  current: string
+  not_added: string[]
+  modified: string[]
+  deleted: string[]
+  staged: string[]
+  conflicted: string[]
+  created: string[]
+  renamed: string[]
+}
+
+export interface BranchInfo {
+  current: string
+  all: string[]
+}
+
+export interface FileTreeNode {
+  name: string
+  path: string
+  type: 'file' | 'directory'
+  children?: FileTreeNode[]
+}
+
+export interface CommitResult {
+  hash: string
+  summary: unknown
+}
+
+// Forensics types (loose — UI는 필요한 필드만 읽음)
+export interface HeatmapEntry {
+  path: string
+  changes: number
+  insertions: number
+  deletions: number
+  lastModified: string
+  authors: string[]
+}
+
+export interface HotspotEntry {
+  path: string
+  score: number
+  changes: number
+  uniqueAuthors: number
+  avgChangesPerCommit: number
+  recentActivity: number
+}
+
+export interface TrendBucket {
+  label: string
+  startDate: string
+  endDate: string
+  commits: number
+  filesChanged: number
+  insertions: number
+  deletions: number
+}
+
+export interface ContributorInfo {
+  name: string
+  email: string
+  commits: number
+  filesOwned: string[]
+  topFiles: { path: string; changes: number }[]
+}
+
+// ───── API ──────────────────────────────────────────────
+
 export const api = {
-  openRepo: (path: string) => call('open_repo', { path }),
+  openRepo: (path: string) => call<RepoInfo>('open_repo', { path }),
 
   getLog: (opts?: { maxCount?: number; file?: string }) =>
-    call('get_log', {
+    call<CommitInfo[]>('get_log', {
       maxCount: opts?.maxCount ?? 200,
       file: opts?.file ?? null,
     }),
 
-  getStatus: () => call('get_status'),
+  getStatus: () => call<StatusInfo>('get_status'),
 
-  getDiff: (hash: string) => call('get_diff', { hash }),
+  getDiff: (hash: string) => call<string>('get_diff', { hash }),
 
-  stage: (files: string[]) => call('stage', { files }),
+  stage: (files: string[]) => call<void>('stage', { files }),
 
-  commit: (message: string) => call('commit', { message }),
+  commit: (message: string) => call<CommitResult>('commit', { message }),
 
-  getBranches: () => call('get_branches'),
+  getBranches: () => call<BranchInfo>('get_branches'),
 
-  checkout: (branch: string) => call('checkout', { branch }),
+  checkout: (branch: string) => call<void>('checkout', { branch }),
 
-  push: () => call('push'),
-  pull: () => call('pull'),
+  createBranch: (name: string, checkout?: boolean) =>
+    call<void>('create_branch', { name, checkout: checkout ?? false }),
 
-  getFileTree: () => call('get_file_tree'),
+  deleteBranch: (name: string, force?: boolean) =>
+    call<void>('delete_branch', { name, force: force ?? false }),
+
+  mergeBranch: (name: string, noFf?: boolean) =>
+    call<string>('merge_branch', { name, noFf: noFf ?? false }),
+
+  push: () => call<void>('push'),
+  pull: () => call<void>('pull'),
+
+  getFileTree: () => call<FileTreeNode[]>('get_file_tree'),
 
   getFileHistory: (filePath: string) =>
-    call('get_file_history', { filePath }),
+    call<CommitInfo[]>('get_file_history', { filePath }),
 
   getHeatmap: (opts?: { days?: number }) =>
-    call('get_heatmap', { days: opts?.days ?? 90 }),
+    call<HeatmapEntry[]>('get_heatmap', { days: opts?.days ?? 90 }),
 
   getHotspots: (opts?: { limit?: number }) =>
-    call('get_hotspots', { limit: opts?.limit ?? 20 }),
+    call<HotspotEntry[]>('get_hotspots', { limit: opts?.limit ?? 20 }),
 
   getTrend: (opts?: { days?: number; buckets?: number }) =>
-    call('get_trend', { days: opts?.days ?? 180, buckets: opts?.buckets ?? 12 }),
+    call<TrendBucket[]>('get_trend', { days: opts?.days ?? 180, buckets: opts?.buckets ?? 12 }),
 
-  getContributors: () => call('get_contributors'),
+  getContributors: () => call<ContributorInfo[]>('get_contributors'),
 }

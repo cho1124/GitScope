@@ -1,12 +1,12 @@
 import { useState, useEffect } from 'react'
-import { api } from '../api'
+import { api, type StatusInfo } from '../api'
 
 interface Props {
   onCommitDone: () => void
 }
 
 export function CommitPanel({ onCommitDone }: Props) {
-  const [status, setStatus] = useState<any>(null)
+  const [status, setStatus] = useState<StatusInfo | null>(null)
   const [message, setMessage] = useState('')
   const [loading, setLoading] = useState(true)
   const [committing, setCommitting] = useState(false)

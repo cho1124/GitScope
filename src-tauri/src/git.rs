@@ -119,6 +119,11 @@ fn parse_log(raw: &str) -> Vec<CommitInfo> {
 
 // ───── Commands ────────────────────────────────
 
+fn strip_long_path_prefix(p: &str) -> String {
+    // Windows canonicalize가 \\?\ prefix를 붙이는 경우 제거
+    p.strip_prefix(r"\\?\").unwrap_or(p).to_string()
+}
+
 #[tauri::command]
 pub fn open_repo(path: String, state: State<AppState>) -> Result<RepoInfo, String> {
     let canonical = PathBuf::from(&path)
@@ -150,8 +155,9 @@ pub fn open_repo(path: String, state: State<AppState>) -> Result<RepoInfo, Strin
         }
     });
 
+    let display_path = strip_long_path_prefix(&canonical.to_string_lossy());
     let info = RepoInfo {
-        path: canonical.to_string_lossy().to_string(),
+        path: display_path,
         current_branch,
         last_commit,
     };
@@ -318,6 +324,55 @@ pub fn checkout(branch: String, state: State<AppState>) -> Result<(), String> {
     with_repo(&state, |path| {
         run_git(path, &["checkout", &branch])?;
         Ok(())
+    })
+}
+
+#[tauri::command]
+pub fn create_branch(
+    name: String,
+    checkout: Option<bool>,
+    state: State<AppState>,
+) -> Result<(), String> {
+    with_repo(&state, |path| {
+        if name.trim().is_empty() {
+            return Err("브랜치 이름이 비어있습니다".to_string());
+        }
+        if checkout.unwrap_or(false) {
+            run_git(path, &["checkout", "-b", &name])?;
+        } else {
+            run_git(path, &["branch", &name])?;
+        }
+        Ok(())
+    })
+}
+
+#[tauri::command]
+pub fn delete_branch(
+    name: String,
+    force: Option<bool>,
+    state: State<AppState>,
+) -> Result<(), String> {
+    with_repo(&state, |path| {
+        let flag = if force.unwrap_or(false) { "-D" } else { "-d" };
+        run_git(path, &["branch", flag, &name])?;
+        Ok(())
+    })
+}
+
+#[tauri::command]
+pub fn merge_branch(
+    name: String,
+    no_ff: Option<bool>,
+    state: State<AppState>,
+) -> Result<String, String> {
+    with_repo(&state, |path| {
+        let mut args: Vec<&str> = vec!["merge"];
+        if no_ff.unwrap_or(false) {
+            args.push("--no-ff");
+        }
+        args.push(&name);
+        let out = run_git(path, &args)?;
+        Ok(out.trim().to_string())
     })
 }
 
