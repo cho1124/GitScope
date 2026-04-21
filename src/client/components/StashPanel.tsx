@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { api, type StashEntry } from '../api'
 import { DiffView } from './DiffView'
 import { useToast } from './Toast'
+import { useConfirm } from './ConfirmModal'
 
 interface Props {
   onStashChanged?: () => void
@@ -9,6 +10,7 @@ interface Props {
 
 export function StashPanel({ onStashChanged }: Props) {
   const toast = useToast()
+  const confirm = useConfirm()
   const [stashes, setStashes] = useState<StashEntry[]>([])
   const [loading, setLoading] = useState(true)
   const [busy, setBusy] = useState(false)
@@ -68,7 +70,13 @@ export function StashPanel({ onStashChanged }: Props) {
   }
 
   const handleDrop = async (ref: string) => {
-    if (!confirm(`${ref} 를 삭제할까요?`)) return
+    const ok = await confirm({
+      title: 'Stash 삭제',
+      message: `${ref} 를 영구 삭제합니다. 되돌릴 수 없습니다.`,
+      confirmLabel: '삭제',
+      variant: 'danger'
+    })
+    if (!ok) return
     setBusy(true)
     const result = await api.stashDrop(ref)
     setBusy(false)

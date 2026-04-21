@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useEffect } from 'react'
 import { api, type RepoInfo } from './api'
 import { FileTree } from './components/FileTree'
 import { CommitLog } from './components/CommitLog'
@@ -64,6 +64,22 @@ export default function App() {
     setRefreshKey(k => k + 1)
   }, [])
 
+  // 키보드 단축키 (Ctrl+1~4 탭 전환, F5 새로고침)
+  useEffect(() => {
+    if (!repo) return
+    const onKey = (e: KeyboardEvent) => {
+      if (e.ctrlKey || e.metaKey) {
+        if (e.key === '1') { e.preventDefault(); setActiveTab('commits') }
+        else if (e.key === '2') { e.preventDefault(); setActiveTab('changes') }
+        else if (e.key === '3') { e.preventDefault(); setActiveTab('stash') }
+        else if (e.key === '4') { e.preventDefault(); setActiveTab('forensics') }
+      }
+      if (e.key === 'F5') { e.preventDefault(); handleRefresh() }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [repo, handleRefresh])
+
   if (!repo) {
     return (
       <div className="app-container">
@@ -83,10 +99,10 @@ export default function App() {
           onBranchChanged={handleBranchChanged}
           refreshKey={refreshKey}
         />
-        <button className="btn btn-sm" onClick={() => setRepo(null)}>
+        <button className="btn btn-sm" onClick={() => setRepo(null)} aria-label="다른 레포 열기">
           다른 레포
         </button>
-        <button className="btn btn-sm" onClick={handleRefresh}>
+        <button className="btn btn-sm" onClick={handleRefresh} title="F5" aria-label="새로고침 (F5)">
           새로고침
         </button>
       </header>
@@ -131,28 +147,40 @@ export default function App() {
 
         {/* Main Content */}
         <div className="main-content">
-          <div className="content-tabs">
+          <div className="content-tabs" role="tablist">
             <button
+              role="tab"
+              aria-selected={activeTab === 'commits'}
               className={`content-tab ${activeTab === 'commits' ? 'active' : ''}`}
               onClick={() => setActiveTab('commits')}
+              title="Ctrl+1"
             >
               커밋 로그
             </button>
             <button
+              role="tab"
+              aria-selected={activeTab === 'changes'}
               className={`content-tab ${activeTab === 'changes' ? 'active' : ''}`}
               onClick={() => setActiveTab('changes')}
+              title="Ctrl+2"
             >
               변경사항
             </button>
             <button
+              role="tab"
+              aria-selected={activeTab === 'stash'}
               className={`content-tab ${activeTab === 'stash' ? 'active' : ''}`}
               onClick={() => setActiveTab('stash')}
+              title="Ctrl+3"
             >
               Stash
             </button>
             <button
+              role="tab"
+              aria-selected={activeTab === 'forensics'}
               className={`content-tab ${activeTab === 'forensics' ? 'active' : ''}`}
               onClick={() => setActiveTab('forensics')}
+              title="Ctrl+4"
             >
               Code Forensics
             </button>

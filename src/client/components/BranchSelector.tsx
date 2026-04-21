@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { api } from '../api'
 import { useToast } from './Toast'
+import { useConfirm } from './ConfirmModal'
 
 interface Props {
   currentBranch: string
@@ -12,6 +13,7 @@ type Mode = null | 'create' | 'merge' | 'delete'
 
 export function BranchSelector({ currentBranch, onBranchChanged, refreshKey }: Props) {
   const toast = useToast()
+  const confirm = useConfirm()
   const [branches, setBranches] = useState<string[]>([])
   const [open, setOpen] = useState(false)
   const [loading, setLoading] = useState(false)
@@ -92,7 +94,13 @@ export function BranchSelector({ currentBranch, onBranchChanged, refreshKey }: P
 
   const handleDelete = async () => {
     if (!targetBranch) return
-    if (!confirm(`브랜치 '${targetBranch}'를 삭제할까요?${forceDelete ? ' (force)' : ''}`)) return
+    const ok = await confirm({
+      title: '브랜치 삭제',
+      message: `브랜치 '${targetBranch}'를 삭제합니다.${forceDelete ? '\n⚠ force (-D) 모드: 병합되지 않은 브랜치도 강제 삭제됩니다.' : ''}`,
+      confirmLabel: '삭제',
+      variant: 'danger'
+    })
+    if (!ok) return
     setLoading(true)
     const result = await api.deleteBranch(targetBranch, forceDelete)
     setLoading(false)
