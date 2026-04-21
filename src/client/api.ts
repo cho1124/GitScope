@@ -1,55 +1,55 @@
-const BASE = '/api'
+import { invoke } from '@tauri-apps/api/core'
 
-async function request(path: string, opts?: RequestInit) {
-  const res = await fetch(`${BASE}${path}`, {
-    headers: { 'Content-Type': 'application/json' },
-    ...opts
-  })
-  return res.json()
+type ApiResult<T> =
+  | { ok: true; data: T }
+  | { ok: false; error: string }
+
+async function call<T>(cmd: string, args?: Record<string, unknown>): Promise<ApiResult<T>> {
+  try {
+    const data = await invoke<T>(cmd, args)
+    return { ok: true, data }
+  } catch (e: unknown) {
+    return { ok: false, error: typeof e === 'string' ? e : String(e) }
+  }
 }
 
 export const api = {
-  openRepo: (path: string) =>
-    request('/repo/open', { method: 'POST', body: JSON.stringify({ path }) }),
+  openRepo: (path: string) => call('open_repo', { path }),
 
-  getLog: (opts?: { maxCount?: number; file?: string }) => {
-    const params = new URLSearchParams()
-    if (opts?.maxCount) params.set('maxCount', String(opts.maxCount))
-    if (opts?.file) params.set('file', opts.file)
-    return request(`/git/log?${params}`)
-  },
+  getLog: (opts?: { maxCount?: number; file?: string }) =>
+    call('get_log', {
+      maxCount: opts?.maxCount ?? 200,
+      file: opts?.file ?? null,
+    }),
 
-  getStatus: () => request('/git/status'),
+  getStatus: () => call('get_status'),
 
-  getDiff: (hash: string) => request(`/git/diff/${hash}`),
+  getDiff: (hash: string) => call('get_diff', { hash }),
 
-  stage: (files: string[]) =>
-    request('/git/stage', { method: 'POST', body: JSON.stringify({ files }) }),
+  stage: (files: string[]) => call('stage', { files }),
 
-  commit: (message: string) =>
-    request('/git/commit', { method: 'POST', body: JSON.stringify({ message }) }),
+  commit: (message: string) => call('commit', { message }),
 
-  getBranches: () => request('/git/branches'),
+  getBranches: () => call('get_branches'),
 
-  checkout: (branch: string) =>
-    request('/git/checkout', { method: 'POST', body: JSON.stringify({ branch }) }),
+  checkout: (branch: string) => call('checkout', { branch }),
 
-  push: () => request('/git/push', { method: 'POST' }),
-  pull: () => request('/git/pull', { method: 'POST' }),
+  push: () => call('push'),
+  pull: () => call('pull'),
 
-  getFileTree: () => request('/git/tree'),
+  getFileTree: () => call('get_file_tree'),
 
   getFileHistory: (filePath: string) =>
-    request(`/git/file-history?path=${encodeURIComponent(filePath)}`),
+    call('get_file_history', { filePath }),
 
   getHeatmap: (opts?: { days?: number }) =>
-    request(`/forensics/heatmap?days=${opts?.days ?? 90}`),
+    call('get_heatmap', { days: opts?.days ?? 90 }),
 
   getHotspots: (opts?: { limit?: number }) =>
-    request(`/forensics/hotspots?limit=${opts?.limit ?? 20}`),
+    call('get_hotspots', { limit: opts?.limit ?? 20 }),
 
   getTrend: (opts?: { days?: number; buckets?: number }) =>
-    request(`/forensics/trend?days=${opts?.days ?? 180}&buckets=${opts?.buckets ?? 12}`),
+    call('get_trend', { days: opts?.days ?? 180, buckets: opts?.buckets ?? 12 }),
 
-  getContributors: () => request('/forensics/contributors')
+  getContributors: () => call('get_contributors'),
 }
