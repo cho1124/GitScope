@@ -1,10 +1,17 @@
 use std::path::PathBuf;
 use std::process::Command;
 
+#[cfg(target_os = "windows")]
+use std::os::windows::process::CommandExt;
+
 use serde::Serialize;
 use tauri::State;
 
 use crate::AppState;
+
+/// Windows에서 CMD 창이 뜨지 않도록 DETACHED_PROCESS | CREATE_NO_WINDOW 플래그 적용
+#[cfg(target_os = "windows")]
+const CREATE_NO_WINDOW: u32 = 0x08000000;
 
 // ───── Shared helpers ──────────────────────────
 
@@ -18,10 +25,13 @@ pub fn with_repo<R>(
 }
 
 pub fn run_git(path: &PathBuf, args: &[&str]) -> Result<String, String> {
-    let output = Command::new("git")
-        .arg("-C")
-        .arg(path)
-        .args(args)
+    let mut cmd = Command::new("git");
+    cmd.arg("-C").arg(path).args(args);
+
+    #[cfg(target_os = "windows")]
+    cmd.creation_flags(CREATE_NO_WINDOW);
+
+    let output = cmd
         .output()
         .map_err(|e| format!("git 실행 실패: {}", e))?;
     if !output.status.success() {
