@@ -10,6 +10,7 @@ import { FileHistory } from './components/FileHistory'
 import { BranchSelector } from './components/BranchSelector'
 import { WelcomeScreen } from './components/WelcomeScreen'
 import { StashPanel } from './components/StashPanel'
+import { ThemeSelector } from './components/ThemeSelector'
 import { useToast } from './components/Toast'
 
 type Tab = 'commits' | 'changes' | 'stash' | 'forensics'
@@ -99,6 +100,7 @@ export default function App() {
           onBranchChanged={handleBranchChanged}
           refreshKey={refreshKey}
         />
+        <ThemeSelector />
         <button className="btn btn-sm" onClick={() => setRepo(null)} aria-label="다른 레포 열기">
           다른 레포
         </button>

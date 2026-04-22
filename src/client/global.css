@@ -6,6 +6,26 @@
 }
 
 :root {
+  /* 구조 토큰 (테마 무관) */
+  --radius: 6px;
+  --radius-sm: 4px;
+  --radius-lg: 10px;
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.25);
+  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.35);
+  --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.5);
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-6: 24px;
+  --transition-fast: 0.15s ease-out;
+  --font-mono: 'Cascadia Code', 'Fira Code', 'JetBrains Mono', monospace;
+  --font-sans: 'Segoe UI', -apple-system, sans-serif;
+}
+
+/* ── Theme: Catppuccin Mocha (default) ─────────── */
+:root,
+:root[data-theme="mocha"] {
   --bg-primary: #1e1e2e;
   --bg-secondary: #181825;
   --bg-surface: #313244;
@@ -21,20 +41,63 @@
   --peach: #fab387;
   --mauve: #cba6f7;
   --border: #45475a;
-  --radius: 6px;
-  --radius-sm: 4px;
-  --radius-lg: 10px;
-  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.25);
-  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.35);
-  --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.5);
-  --space-1: 4px;
-  --space-2: 8px;
-  --space-3: 12px;
-  --space-4: 16px;
-  --space-6: 24px;
-  --transition-fast: 0.15s ease-out;
-  --font-mono: 'Cascadia Code', 'Fira Code', 'JetBrains Mono', monospace;
-  --font-sans: 'Segoe UI', -apple-system, sans-serif;
+}
+
+/* ── Theme: Catppuccin Latte (light) ───────────── */
+:root[data-theme="latte"] {
+  --bg-primary: #eff1f5;
+  --bg-secondary: #e6e9ef;
+  --bg-surface: #ccd0da;
+  --bg-hover: #bcc0cc;
+  --text-primary: #4c4f69;
+  --text-secondary: #6c6f85;
+  --text-muted: #9ca0b0;
+  --accent: #1e66f5;
+  --accent-hover: #04a5e5;
+  --green: #40a02b;
+  --red: #d20f39;
+  --yellow: #df8e1d;
+  --peach: #fe640b;
+  --mauve: #8839ef;
+  --border: #bcc0cc;
+}
+
+/* ── Theme: Catppuccin Frappé ──────────────────── */
+:root[data-theme="frappe"] {
+  --bg-primary: #303446;
+  --bg-secondary: #292c3c;
+  --bg-surface: #414559;
+  --bg-hover: #51576d;
+  --text-primary: #c6d0f5;
+  --text-secondary: #a5adce;
+  --text-muted: #737994;
+  --accent: #8caaee;
+  --accent-hover: #99d1db;
+  --green: #a6d189;
+  --red: #e78284;
+  --yellow: #e5c890;
+  --peach: #ef9f76;
+  --mauve: #ca9ee6;
+  --border: #51576d;
+}
+
+/* ── Theme: Catppuccin Macchiato ───────────────── */
+:root[data-theme="macchiato"] {
+  --bg-primary: #24273a;
+  --bg-secondary: #1e2030;
+  --bg-surface: #363a4f;
+  --bg-hover: #494d64;
+  --text-primary: #cad3f5;
+  --text-secondary: #a5adcb;
+  --text-muted: #6e738d;
+  --accent: #8aadf4;
+  --accent-hover: #91d7e3;
+  --green: #a6da95;
+  --red: #ed8796;
+  --yellow: #eed49f;
+  --peach: #f5a97f;
+  --mauve: #c6a0f6;
+  --border: #494d64;
 }
 
 html, body, #root {
@@ -565,4 +628,51 @@ textarea {
 @keyframes progress-indeterminate {
   0%   { margin-left: -30%; }
   100% { margin-left: 100%; }
+}
+
+/* ── Theme Selector ──────────────────────────── */
+.theme-dropdown {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  margin-top: 4px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-md);
+  z-index: 100;
+  min-width: 160px;
+  padding: 4px;
+}
+
+.theme-option {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 6px 8px;
+  background: transparent;
+  border: none;
+  color: var(--text-primary);
+  font-size: 12px;
+  text-align: left;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: background var(--transition-fast);
+}
+
+.theme-option.selected {
+  background: var(--bg-surface);
+}
+
+.theme-option:hover {
+  background: var(--bg-hover);
+}
+
+.theme-swatch {
+  width: 14px;
+  height: 14px;
+  border-radius: 4px;
+  border: 1px solid var(--border);
+  flex-shrink: 0;
 }
