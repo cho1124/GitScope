@@ -1,6 +1,13 @@
 import { useState, useEffect, type ReactNode } from 'react'
 import { TrendingUp, Flame, Map as MapIcon, Users } from 'lucide-react'
-import { api, type HeatmapEntry, type HotspotEntry, type TrendBucket, type ContributorInfo } from '../api'
+import {
+  api,
+  type HeatmapEntry,
+  type HotspotEntry,
+  type TrendBucket,
+  type ContributorInfo,
+  type ProgressEvent,
+} from '../api'
 import { HeatmapCard } from './forensics/HeatmapCard'
 import { HotspotCard } from './forensics/HotspotCard'
 import { TrendChart } from './forensics/TrendChart'
@@ -9,7 +16,7 @@ import { useToast } from './Toast'
 
 type AsyncState<T> =
   | { status: 'idle' }
-  | { status: 'loading' }
+  | { status: 'loading'; progress?: ProgressEvent }
   | { status: 'ready'; data: T }
   | { status: 'error'; error: string }
 
@@ -19,7 +26,45 @@ interface CardMeta {
   color: string
 }
 
-function CardWrapper({ meta, state, children, onRetry, fullWidth }: {
+function formatProgress(p: ProgressEvent | undefined): { text: string; ratio?: number } {
+  if (!p) return { text: '로딩 중...' }
+  switch (p.stage) {
+    case 'cacheHit':
+      return { text: '캐시 히트' }
+    case 'counting':
+      return { text: '커밋 수 세는 중...' }
+    case 'scanning': {
+      const { current, total } = p
+      const ratio = total > 0 ? Math.min(1, current / total) : undefined
+      const pct = ratio !== undefined ? ` (${Math.round(ratio * 100)}%)` : ''
+      return {
+        text: `${current.toLocaleString()} / ${total.toLocaleString()} 커밋 분석 중${pct}`,
+        ratio,
+      }
+    }
+    case 'aggregating':
+      return { text: '집계 중...' }
+  }
+}
+
+function ProgressBar({ ratio }: { ratio?: number }) {
+  return (
+    <div className="progress-bar">
+      <div
+        className={`progress-bar-fill ${ratio === undefined ? 'indeterminate' : ''}`}
+        style={ratio !== undefined ? { width: `${ratio * 100}%` } : undefined}
+      />
+    </div>
+  )
+}
+
+function CardWrapper({
+  meta,
+  state,
+  children,
+  onRetry,
+  fullWidth,
+}: {
   meta: CardMeta
   state: AsyncState<unknown>
   children: ReactNode
@@ -34,11 +79,23 @@ function CardWrapper({ meta, state, children, onRetry, fullWidth }: {
     </h3>
   )
   if (state.status === 'loading') {
+    const { text, ratio } = formatProgress(state.progress)
     return (
       <div className={`forensics-card ${fullWidth ? 'full-width' : ''}`}>
         {header}
-        <div className="loading" style={{ padding: '16px' }}>
-          <span className="spinner" /> 로딩 중...
+        <div style={{ padding: '16px' }}>
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              fontSize: '11px',
+              color: 'var(--text-muted)',
+            }}
+          >
+            <span className="spinner" /> {text}
+          </div>
+          <ProgressBar ratio={ratio} />
         </div>
       </div>
     )
@@ -74,29 +131,43 @@ export function ForensicsDashboard() {
   const [heatmapState, setHeatmapState] = useState<AsyncState<HeatmapEntry[]>>({ status: 'idle' })
   const [hotspotState, setHotspotState] = useState<AsyncState<HotspotEntry[]>>({ status: 'idle' })
   const [trendState, setTrendState] = useState<AsyncState<TrendBucket[]>>({ status: 'idle' })
-  const [contributorState, setContributorState] = useState<AsyncState<ContributorInfo[]>>({ status: 'idle' })
+  const [contributorState, setContributorState] = useState<AsyncState<ContributorInfo[]>>({
+    status: 'idle',
+  })
 
   const loadHeatmap = async (d: number) => {
     setHeatmapState({ status: 'loading' })
-    const r = await api.getHeatmap({ days: d })
+    const r = await api.getHeatmap({
+      days: d,
+      onProgress: e => setHeatmapState({ status: 'loading', progress: e }),
+    })
     setHeatmapState(r.ok ? { status: 'ready', data: r.data } : { status: 'error', error: r.error })
   }
 
   const loadHotspots = async () => {
     setHotspotState({ status: 'loading' })
-    const r = await api.getHotspots({ limit: 15 })
+    const r = await api.getHotspots({
+      limit: 15,
+      onProgress: e => setHotspotState({ status: 'loading', progress: e }),
+    })
     setHotspotState(r.ok ? { status: 'ready', data: r.data } : { status: 'error', error: r.error })
   }
 
   const loadTrend = async () => {
     setTrendState({ status: 'loading' })
-    const r = await api.getTrend({ days: 180, buckets: 12 })
+    const r = await api.getTrend({
+      days: 180,
+      buckets: 12,
+      onProgress: e => setTrendState({ status: 'loading', progress: e }),
+    })
     setTrendState(r.ok ? { status: 'ready', data: r.data } : { status: 'error', error: r.error })
   }
 
   const loadContributors = async () => {
     setContributorState({ status: 'loading' })
-    const r = await api.getContributors()
+    const r = await api.getContributors({
+      onProgress: e => setContributorState({ status: 'loading', progress: e }),
+    })
     if (r.ok) {
       setContributorState({ status: 'ready', data: r.data })
     } else {
@@ -121,8 +192,12 @@ export function ForensicsDashboard() {
           value={days}
           onChange={e => setDays(Number(e.target.value))}
           style={{
-            background: 'var(--bg-surface)', border: '1px solid var(--border)',
-            borderRadius: 'var(--radius)', color: 'var(--text-primary)', padding: '4px 8px', fontSize: '11px'
+            background: 'var(--bg-surface)',
+            border: '1px solid var(--border)',
+            borderRadius: 'var(--radius)',
+            color: 'var(--text-primary)',
+            padding: '4px 8px',
+            fontSize: '11px',
           }}
         >
           <option value={30}>최근 30일</option>
@@ -144,7 +219,12 @@ export function ForensicsDashboard() {
         </CardWrapper>
 
         {/* Heatmap */}
-        <CardWrapper meta={cardMeta.heatmap} state={heatmapState} onRetry={() => loadHeatmap(days)} fullWidth>
+        <CardWrapper
+          meta={cardMeta.heatmap}
+          state={heatmapState}
+          onRetry={() => loadHeatmap(days)}
+          fullWidth
+        >
           {heatmapState.status === 'ready' && <HeatmapCard data={heatmapState.data} />}
         </CardWrapper>
 
@@ -158,13 +238,23 @@ export function ForensicsDashboard() {
             <div style={{ padding: '16px', fontSize: '11px', color: 'var(--text-muted)' }}>
               큰 레포에서는 시간이 걸릴 수 있어 수동 로드로 분리했습니다.
             </div>
-            <button className="btn btn-primary btn-sm" onClick={loadContributors} style={{ width: '100%' }}>
+            <button
+              className="btn btn-primary btn-sm"
+              onClick={loadContributors}
+              style={{ width: '100%' }}
+            >
               기여자 분석 로드
             </button>
           </div>
         ) : (
-          <CardWrapper meta={cardMeta.contributors} state={contributorState} onRetry={loadContributors}>
-            {contributorState.status === 'ready' && <ContributorCard contributors={contributorState.data} />}
+          <CardWrapper
+            meta={cardMeta.contributors}
+            state={contributorState}
+            onRetry={loadContributors}
+          >
+            {contributorState.status === 'ready' && (
+              <ContributorCard contributors={contributorState.data} />
+            )}
           </CardWrapper>
         )}
       </div>

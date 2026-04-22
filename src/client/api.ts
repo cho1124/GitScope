@@ -1,4 +1,4 @@
-import { invoke } from '@tauri-apps/api/core'
+import { invoke, Channel } from '@tauri-apps/api/core'
 
 type ApiResult<T> =
   | { ok: true; data: T }
@@ -109,7 +109,20 @@ export interface StashEntry {
   message: string
 }
 
+// Forensics progress event (Phase 7-1)
+export type ProgressEvent =
+  | { stage: 'cacheHit' }
+  | { stage: 'counting' }
+  | { stage: 'scanning'; current: number; total: number }
+  | { stage: 'aggregating' }
+
 // ───── API ──────────────────────────────────────────────
+
+function mkProgressChannel(handler?: (e: ProgressEvent) => void): Channel<ProgressEvent> {
+  const ch = new Channel<ProgressEvent>()
+  if (handler) ch.onmessage = handler
+  return ch
+}
 
 export const api = {
   openRepo: (path: string) => call<RepoInfo>('open_repo', { path }),
@@ -158,16 +171,34 @@ export const api = {
 
   clearRecentRepos: () => call<void>('clear_recent_repos'),
 
-  getHeatmap: (opts?: { days?: number }) =>
-    call<HeatmapEntry[]>('get_heatmap', { days: opts?.days ?? 90 }),
+  // ── Forensics (with progress streaming) ─────────────
+  getHeatmap: (opts?: { days?: number; onProgress?: (e: ProgressEvent) => void }) =>
+    call<HeatmapEntry[]>('get_heatmap', {
+      days: opts?.days ?? 90,
+      onProgress: mkProgressChannel(opts?.onProgress),
+    }),
 
-  getHotspots: (opts?: { limit?: number }) =>
-    call<HotspotEntry[]>('get_hotspots', { limit: opts?.limit ?? 20 }),
+  getHotspots: (opts?: { limit?: number; onProgress?: (e: ProgressEvent) => void }) =>
+    call<HotspotEntry[]>('get_hotspots', {
+      limit: opts?.limit ?? 20,
+      onProgress: mkProgressChannel(opts?.onProgress),
+    }),
 
-  getTrend: (opts?: { days?: number; buckets?: number }) =>
-    call<TrendBucket[]>('get_trend', { days: opts?.days ?? 180, buckets: opts?.buckets ?? 12 }),
+  getTrend: (opts?: {
+    days?: number
+    buckets?: number
+    onProgress?: (e: ProgressEvent) => void
+  }) =>
+    call<TrendBucket[]>('get_trend', {
+      days: opts?.days ?? 180,
+      buckets: opts?.buckets ?? 12,
+      onProgress: mkProgressChannel(opts?.onProgress),
+    }),
 
-  getContributors: () => call<ContributorInfo[]>('get_contributors'),
+  getContributors: (opts?: { onProgress?: (e: ProgressEvent) => void }) =>
+    call<ContributorInfo[]>('get_contributors', {
+      onProgress: mkProgressChannel(opts?.onProgress),
+    }),
 
   // ── Stash ────────────────────────────────────────────
   stashList: () => call<StashEntry[]>('stash_list'),

@@ -1,12 +1,21 @@
 use std::collections::{HashMap, HashSet};
+use std::io::{BufRead, BufReader};
 use std::path::PathBuf;
+use std::process::{Command, Stdio};
+
+#[cfg(target_os = "windows")]
+use std::os::windows::process::CommandExt;
 
 use chrono::{DateTime, Datelike, Duration, FixedOffset, Utc};
 use serde::Serialize;
+use tauri::ipc::Channel;
 use tauri::State;
 
 use crate::git::{run_git, with_repo};
 use crate::AppState;
+
+#[cfg(target_os = "windows")]
+const CREATE_NO_WINDOW: u32 = 0x08000000;
 
 // ───── Cache ───────────────────────────────────
 
@@ -33,35 +42,86 @@ pub struct CachedScan {
     commits: Vec<CommitEntry>,
 }
 
+// ───── Progress events ─────────────────────────
+
+#[derive(Clone, Serialize)]
+#[serde(tag = "stage", rename_all = "camelCase")]
+pub enum ProgressEvent {
+    /// 캐시에서 즉시 반환
+    CacheHit,
+    /// 총 커밋 수 집계 중
+    Counting,
+    /// git log 스트리밍 중
+    Scanning { current: u32, total: u32 },
+    /// 합산/정렬 중
+    Aggregating,
+}
+
 fn current_head(path: &PathBuf) -> Result<String, String> {
     Ok(run_git(path, &["rev-parse", "HEAD"])?.trim().to_string())
 }
 
-fn scan_log(path: &PathBuf, since_days: Option<u32>) -> Result<Vec<CommitEntry>, String> {
+fn count_commits(path: &PathBuf, since_days: Option<u32>) -> Result<u32, String> {
+    let since_owned: Option<String> = since_days.map(|d| {
+        let since = Utc::now() - Duration::days(d as i64);
+        format!("--since={}", since.format("%Y-%m-%d"))
+    });
+    let mut args: Vec<&str> = vec!["rev-list", "--count", "HEAD", "--no-merges"];
+    if let Some(s) = &since_owned {
+        args.push(s.as_str());
+    }
+    let out = run_git(path, &args)?;
+    out.trim()
+        .parse::<u32>()
+        .map_err(|e| format!("commit count 파싱 실패: {}", e))
+}
+
+fn scan_log_streaming(
+    path: &PathBuf,
+    since_days: Option<u32>,
+    progress: Option<&Channel<ProgressEvent>>,
+) -> Result<Vec<CommitEntry>, String> {
+    if let Some(p) = progress {
+        let _ = p.send(ProgressEvent::Counting);
+    }
+    let total = count_commits(path, since_days).unwrap_or(0);
+
     let since_owned: Option<String> = since_days.map(|d| {
         let since = Utc::now() - Duration::days(d as i64);
         format!("--since={}", since.format("%Y-%m-%d"))
     });
 
-    let mut args: Vec<&str> = vec![
+    let mut cmd = Command::new("git");
+    cmd.arg("-C").arg(path);
+    cmd.args([
         "log",
         "--numstat",
         "--format=COMMIT_SEP%H\x1f%an\x1f%ae\x1f%aI",
         "--no-merges",
-    ];
+    ]);
     if let Some(s) = &since_owned {
-        args.push(s.as_str());
+        cmd.arg(s);
     }
 
-    let raw = run_git(path, &args)?;
-    Ok(parse_numstat_log(&raw))
-}
+    #[cfg(target_os = "windows")]
+    cmd.creation_flags(CREATE_NO_WINDOW);
 
-fn parse_numstat_log(raw: &str) -> Vec<CommitEntry> {
+    cmd.stdout(Stdio::piped());
+    cmd.stderr(Stdio::piped());
+
+    let mut child = cmd.spawn().map_err(|e| format!("git spawn 실패: {}", e))?;
+    let stdout = child.stdout.take().ok_or("stdout 없음")?;
+
     let mut commits: Vec<CommitEntry> = Vec::new();
     let mut current: Option<CommitEntry> = None;
+    let mut count: u32 = 0;
+    let mut last_reported: u32 = 0;
+    let report_step: u32 = std::cmp::max(100, total / 100); // 1%마다 또는 100 커밋마다
 
-    for line in raw.lines() {
+    let reader = BufReader::new(stdout);
+    for line_res in reader.lines() {
+        let line = line_res.map_err(|e| format!("git log 읽기 실패: {}", e))?;
+
         if let Some(rest) = line.strip_prefix("COMMIT_SEP") {
             if let Some(c) = current.take() {
                 commits.push(c);
@@ -76,6 +136,13 @@ fn parse_numstat_log(raw: &str) -> Vec<CommitEntry> {
                         date,
                         files: Vec::new(),
                     });
+                }
+            }
+            count += 1;
+            if let Some(p) = progress {
+                if count - last_reported >= report_step {
+                    last_reported = count;
+                    let _ = p.send(ProgressEvent::Scanning { current: count, total });
                 }
             }
             continue;
@@ -99,11 +166,11 @@ fn parse_numstat_log(raw: &str) -> Vec<CommitEntry> {
         } else {
             fields[1].parse().unwrap_or(0)
         };
-        let path = fields[2].to_string();
+        let fpath = fields[2].to_string();
 
         if let Some(c) = current.as_mut() {
             c.files.push(FileChange {
-                path,
+                path: fpath,
                 insertions: ins,
                 deletions: del,
             });
@@ -114,31 +181,50 @@ fn parse_numstat_log(raw: &str) -> Vec<CommitEntry> {
         commits.push(c);
     }
 
-    commits
+    let status = child.wait().map_err(|e| format!("git wait 실패: {}", e))?;
+    if !status.success() {
+        return Err("git log 비정상 종료".to_string());
+    }
+
+    if let Some(p) = progress {
+        let _ = p.send(ProgressEvent::Scanning {
+            current: count,
+            total,
+        });
+        let _ = p.send(ProgressEvent::Aggregating);
+    }
+
+    Ok(commits)
 }
 
 fn ensure_scanned(
     state: &State<AppState>,
     path: &PathBuf,
     need_days: Option<u32>,
+    progress: Option<&Channel<ProgressEvent>>,
 ) -> Result<Vec<CommitEntry>, String> {
     let head = current_head(path)?;
     let mut cache_guard = state.forensics_cache.lock().map_err(|e| e.to_string())?;
 
     let reuse = match cache_guard.as_ref() {
         Some(c) if c.head == head => match (c.since_days, need_days) {
-            (None, _) => true,                // cache has full history
-            (Some(cd), Some(nd)) => cd >= nd, // cache wider than request
-            (Some(_), None) => false,         // need full but cache is partial
+            (None, _) => true,
+            (Some(cd), Some(nd)) => cd >= nd,
+            (Some(_), None) => false,
         },
         _ => false,
     };
 
     if reuse {
+        if let Some(p) = progress {
+            let _ = p.send(ProgressEvent::CacheHit);
+        }
         return Ok(cache_guard.as_ref().unwrap().commits.clone());
     }
 
-    let commits = scan_log(path, need_days)?;
+    // lock을 scan 동안 유지: 같은 시점에 여러 forensics 호출이 와도 중복 scan 방지.
+    // 두 번째 호출부터는 lock 획득 시점에 cache hit으로 빠르게 완료됨.
+    let commits = scan_log_streaming(path, need_days, progress)?;
     *cache_guard = Some(CachedScan {
         head,
         since_days: need_days,
@@ -251,11 +337,13 @@ fn days_since(iso: &str) -> i64 {
 #[tauri::command]
 pub fn get_heatmap(
     days: Option<u32>,
+    on_progress: Channel<ProgressEvent>,
     state: State<AppState>,
 ) -> Result<Vec<HeatmapEntry>, String> {
     let d = days.unwrap_or(90);
     with_repo(&state, |path| {
-        let commits = ensure_scanned(&state, path, Some(d))?;
+        let commits = ensure_scanned(&state, path, Some(d), Some(&on_progress))?;
+        let _ = on_progress.send(ProgressEvent::Aggregating);
         let cutoff = Utc::now() - Duration::days(d as i64);
         Ok(build_heatmap(&commits, cutoff))
     })
@@ -264,11 +352,13 @@ pub fn get_heatmap(
 #[tauri::command]
 pub fn get_hotspots(
     limit: Option<u32>,
+    on_progress: Channel<ProgressEvent>,
     state: State<AppState>,
 ) -> Result<Vec<HotspotEntry>, String> {
     let lim = limit.unwrap_or(20) as usize;
     with_repo(&state, |path| {
-        let commits = ensure_scanned(&state, path, Some(180))?;
+        let commits = ensure_scanned(&state, path, Some(180), Some(&on_progress))?;
+        let _ = on_progress.send(ProgressEvent::Aggregating);
         let cutoff = Utc::now() - Duration::days(180);
         let heatmap = build_heatmap(&commits, cutoff);
 
@@ -310,12 +400,15 @@ pub fn get_hotspots(
 pub fn get_trend(
     days: Option<u32>,
     buckets: Option<u32>,
+    on_progress: Channel<ProgressEvent>,
     state: State<AppState>,
 ) -> Result<Vec<TrendBucket>, String> {
     let d = days.unwrap_or(180);
     let b = buckets.unwrap_or(12).max(1);
     with_repo(&state, |path| {
-        let commits = ensure_scanned(&state, path, Some(d))?;
+        let commits = ensure_scanned(&state, path, Some(d), Some(&on_progress))?;
+        let _ = on_progress.send(ProgressEvent::Aggregating);
+
         let now = Utc::now();
         let start = now - Duration::days(d as i64);
         let bucket_size_days = (d as f64) / (b as f64);
@@ -323,7 +416,8 @@ pub fn get_trend(
         let mut result: Vec<TrendBucket> = Vec::with_capacity(b as usize);
         for i in 0..b {
             let bs = start + Duration::seconds((i as f64 * bucket_size_days * 86400.0) as i64);
-            let be = start + Duration::seconds(((i + 1) as f64 * bucket_size_days * 86400.0) as i64);
+            let be =
+                start + Duration::seconds(((i + 1) as f64 * bucket_size_days * 86400.0) as i64);
             result.push(TrendBucket {
                 label: format!("{}월 {}일", bs.month(), bs.day()),
                 start_date: bs.format("%Y-%m-%d").to_string(),
@@ -368,9 +462,14 @@ pub fn get_trend(
 }
 
 #[tauri::command]
-pub fn get_contributors(state: State<AppState>) -> Result<Vec<ContributorInfo>, String> {
+pub fn get_contributors(
+    on_progress: Channel<ProgressEvent>,
+    state: State<AppState>,
+) -> Result<Vec<ContributorInfo>, String> {
     with_repo(&state, |path| {
-        let commits = ensure_scanned(&state, path, None)?; // full history
+        let commits = ensure_scanned(&state, path, None, Some(&on_progress))?;
+        let _ = on_progress.send(ProgressEvent::Aggregating);
+
         let mut map: HashMap<String, (String, String, u32, HashMap<String, u32>)> = HashMap::new();
 
         for c in commits.iter() {
