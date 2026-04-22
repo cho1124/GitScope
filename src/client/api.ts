@@ -109,6 +109,14 @@ export interface StashEntry {
   message: string
 }
 
+// Symbol: 파일 안의 함수/클래스/메서드 등 (Phase 9-A)
+export interface Symbol {
+  name: string
+  kind: string   // "function" | "class" | "method" | "interface" | "enum" | "type" | "struct" | "trait" | "impl" | "mod"
+  startLine: number
+  endLine: number
+}
+
 // Forensics progress event (Phase 7-1)
 export type ProgressEvent =
   | { stage: 'cacheHit' }
@@ -217,4 +225,11 @@ export const api = {
   // ── Working tree diff ────────────────────────────────
   getUnstagedDiff: (file: string) => call<string>('get_unstaged_diff', { file }),
   getStagedDiff: (file: string) => call<string>('get_staged_diff', { file }),
+
+  // ── Symbols (Phase 9) ────────────────────────────────
+  getSymbols: (filePath: string) =>
+    call<Symbol[]>('get_symbols', { filePath }),
+
+  getSymbolHistory: (filePath: string, startLine: number, endLine: number) =>
+    call<CommitInfo[]>('get_symbol_history', { filePath, startLine, endLine }),
 }

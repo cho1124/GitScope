@@ -2,6 +2,7 @@ mod forensics;
 mod git;
 mod recent;
 mod stash;
+mod symbols;
 
 use std::path::PathBuf;
 use std::sync::Mutex;
@@ -61,6 +62,8 @@ pub fn run() {
             stash::stash_show,
             stash::get_unstaged_diff,
             stash::get_staged_diff,
+            symbols::get_symbols,
+            symbols::get_symbol_history,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

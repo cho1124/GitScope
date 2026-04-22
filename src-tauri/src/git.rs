@@ -61,13 +61,13 @@ pub struct RepoInfo {
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct CommitInfo {
-    hash: String,
-    hash_short: String,
-    message: String,
-    author: String,
-    email: String,
-    date: String,
-    refs: String,
+    pub hash: String,
+    pub hash_short: String,
+    pub message: String,
+    pub author: String,
+    pub email: String,
+    pub date: String,
+    pub refs: String,
 }
 
 #[derive(Serialize)]
