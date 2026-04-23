@@ -9,8 +9,8 @@ Code Forensics 시각화와 **심볼 단위 히스토리**를 내장한 **로컬
 
 ## 다운로드
 
-**[최신 릴리즈 → v0.1.1](https://github.com/cho1124/GitScope/releases/latest)**  
-(v0.2.0 준비 중 — 심볼 단위 히스토리 + 테마 전환 + Forensics 진행률)
+**[최신 릴리즈 → v0.2.0](https://github.com/cho1124/GitScope/releases/latest)**  
+(Phase 7: Forensics 진행률 + 테마 전환 · Phase 9: 심볼 단위 히스토리 + 브랜치 그래프)
 
 | 파일 | 크기 | 설명 |
 |------|------|------|
