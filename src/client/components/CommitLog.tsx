@@ -1,6 +1,11 @@
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { Tag } from 'lucide-react'
 import { api, type CommitInfo } from '../api'
+import { buildGraph, maxLaneCount } from '../lib/graph'
+import { CommitGraph } from './CommitGraph'
+
+const GRAPH_LINE_HEIGHT = 36
+const GRAPH_LANE_WIDTH = 14
 
 interface Props {
   selectedCommit: string | null
@@ -128,6 +133,10 @@ export function CommitLog({ selectedCommit, onSelectCommit, file }: Props) {
     return d.toLocaleDateString('ko-KR', { year: 'numeric', month: 'short', day: 'numeric' })
   }
 
+  // 그래프 레인 계산
+  const graphRows = useMemo(() => buildGraph(commits), [commits])
+  const laneCount = useMemo(() => maxLaneCount(graphRows), [graphRows])
+
   if (loading) return <div className="loading"><span className="spinner" /> 커밋 로딩 중...</div>
   if (commits.length === 0) return <div className="loading">커밋이 없습니다</div>
 
@@ -140,9 +149,10 @@ export function CommitLog({ selectedCommit, onSelectCommit, file }: Props) {
         role="listbox"
         aria-label="커밋 목록 (↑/↓ 또는 j/k 로 이동)"
       >
-        {commits.map(commit => {
+        {commits.map((commit, idx) => {
           const parsed = parseRefs(commit.refs)
           const isSelected = selectedCommit === commit.hash
+          const graphRow = graphRows[idx]
           return (
             <li
               key={commit.hash}
@@ -152,6 +162,15 @@ export function CommitLog({ selectedCommit, onSelectCommit, file }: Props) {
               role="option"
               aria-selected={isSelected}
             >
+              {graphRow && (
+                <CommitGraph
+                  row={graphRow}
+                  commitHash={commit.hash}
+                  laneCount={laneCount}
+                  laneWidth={GRAPH_LANE_WIDTH}
+                  lineHeight={GRAPH_LINE_HEIGHT}
+                />
+              )}
               <span className="commit-hash">{commit.hashShort}</span>
               <span className="commit-message">
                 {parsed.head && (

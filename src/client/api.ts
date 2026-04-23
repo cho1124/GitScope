@@ -29,6 +29,7 @@ export interface CommitInfo {
   email: string
   date: string
   refs: string
+  parents: string[]
 }
 
 export interface StatusInfo {

@@ -183,7 +183,7 @@ pub fn get_symbol_history(
                 "log",
                 "-L",
                 &l_arg,
-                "--format=COMMIT_SEP%H\x1f%h\x1f%s\x1f%an\x1f%ae\x1f%aI\x1f%D",
+                "--format=COMMIT_SEP%H\x1f%h\x1f%s\x1f%an\x1f%ae\x1f%aI\x1f%D\x1f%P",
             ],
         )?;
         Ok(parse_symbol_log(&raw))
@@ -196,10 +196,14 @@ fn parse_symbol_log(raw: &str) -> Vec<CommitInfo> {
         let Some(first_line) = chunk.lines().next() else {
             continue;
         };
-        let parts: Vec<&str> = first_line.splitn(7, '\x1f').collect();
-        if parts.len() != 7 {
+        let parts: Vec<&str> = first_line.splitn(8, '\x1f').collect();
+        if parts.len() != 8 {
             continue;
         }
+        let parents: Vec<String> = parts[7]
+            .split_whitespace()
+            .map(|s| s.to_string())
+            .collect();
         commits.push(CommitInfo {
             hash: parts[0].to_string(),
             hash_short: parts[1].to_string(),
@@ -208,6 +212,7 @@ fn parse_symbol_log(raw: &str) -> Vec<CommitInfo> {
             email: parts[4].to_string(),
             date: parts[5].to_string(),
             refs: parts[6].to_string(),
+            parents,
         });
     }
     commits

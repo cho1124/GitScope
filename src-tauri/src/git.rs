@@ -68,6 +68,8 @@ pub struct CommitInfo {
     pub email: String,
     pub date: String,
     pub refs: String,
+    /// 부모 커밋 해시들 (full SHA, 공백으로 split된 결과)
+    pub parents: Vec<String>,
 }
 
 #[derive(Serialize)]
@@ -110,10 +112,14 @@ fn parse_log(raw: &str) -> Vec<CommitInfo> {
     raw.lines()
         .filter(|l| !l.is_empty())
         .filter_map(|line| {
-            let parts: Vec<&str> = line.splitn(7, '\x1f').collect();
-            if parts.len() != 7 {
+            let parts: Vec<&str> = line.splitn(8, '\x1f').collect();
+            if parts.len() != 8 {
                 return None;
             }
+            let parents: Vec<String> = parts[7]
+                .split_whitespace()
+                .map(|s| s.to_string())
+                .collect();
             Some(CommitInfo {
                 hash: parts[0].to_string(),
                 hash_short: parts[1].to_string(),
@@ -122,6 +128,7 @@ fn parse_log(raw: &str) -> Vec<CommitInfo> {
                 email: parts[4].to_string(),
                 date: parts[5].to_string(),
                 refs: parts[6].to_string(),
+                parents,
             })
         })
         .collect()
@@ -208,7 +215,7 @@ pub fn get_log(
         let mut args: Vec<&str> = vec![
             "log",
             &max_arg,
-            "--pretty=format:%H\x1f%h\x1f%s\x1f%an\x1f%ae\x1f%aI\x1f%D",
+            "--pretty=format:%H\x1f%h\x1f%s\x1f%an\x1f%ae\x1f%aI\x1f%D\x1f%P",
         ];
         let file_ref;
         if let Some(f) = &file {
@@ -421,7 +428,7 @@ pub fn get_file_history(
                 "log",
                 "-100",
                 "--follow",
-                "--pretty=format:%H\x1f%h\x1f%s\x1f%an\x1f%ae\x1f%aI\x1f%D",
+                "--pretty=format:%H\x1f%h\x1f%s\x1f%an\x1f%ae\x1f%aI\x1f%D\x1f%P",
                 "--",
                 &file_path,
             ],
