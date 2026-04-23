@@ -2,16 +2,17 @@
 
 > 작업 이어받기용 문서. 다른 PC/세션에서 이어받을 때 이 파일만 읽어도 컨텍스트 복원됨.
 
-## 현재 상태 (2026-04-21 밤 기준)
+## 현재 상태 (2026-04-22 기준)
 
-**Phase 4~6 전체 완료 + v0.1.1 릴리즈 배포.**
+**Phase 0~6 + Phase 7 + Phase 9-A/B/C 완료.** 다음 릴리즈 후보: **v0.2.0**.
 
 ### 한 줄 요약
-Express + Vite 웹앱 → Tauri 2.10 + Rust 로컬 앱으로 전면 재작성 후, 브랜치 UI / 최근 레포 / Stash / Forensics 개별 로딩 / Diff virtualization / Lucide 아이콘까지 완료. 깃헙 Releases에 NSIS/MSI 배포.
+Express + Vite 웹앱 → Tauri 2.10 + Rust 로컬 앱으로 재작성 후, 브랜치 UI / 최근 레포 / Stash / Forensics 개별 로딩 / Diff virtualization / Lucide 아이콘 / **Forensics 진행률 스트리밍** / **Catppuccin 4 flavor 테마 전환** / **심볼 단위 히스토리 (Tree-sitter + `git log -L`) · TS/TSX/JS/Rust/Python/C# 지원** 까지 완성.
 
 ### 릴리즈
 - **v0.1.0** (2026-04-21 저녁) — 첫 배포
 - **v0.1.1** (2026-04-21 밤) — Windows CMD 창 무한 깜빡임 버그 수정
+- **v0.2.0** — 예정 (Phase 7 + 9 심볼 단위 히스토리 반영)
 
 ## 왜 Tauri로 갔나 (결정 배경)
 
@@ -55,7 +56,7 @@ npm install
 npm run dev
 ```
 
-첫 `npm run dev`는 Rust 크레이트들 컴파일해서 **첫 빌드 1분 내외** 소요. 이후 재실행은 즉시.
+첫 `npm run dev`는 Rust 크레이트(tree-sitter grammar 4종 포함) 컴파일해서 **첫 빌드 2분 내외** 소요. 이후 재실행은 즉시.
 
 ### 릴리즈 빌드 (배포용)
 ```bash
@@ -150,62 +151,75 @@ gh release create vX.Y.Z \
 
 ### Phase 6 — 디자인 개선 ✅
 - **Lucide 아이콘** 도입 (`lucide-react`): 모든 이모지 → 일관된 SVG
-  - Toast: Info/CheckCircle2/XCircle/AlertTriangle/X
-  - ConfirmModal: AlertTriangle/Info
-  - FileTree: Folder/FolderOpen/FileText
-  - WelcomeScreen: FolderOpen/Folder/X
-  - BranchSelector: GitBranch/ChevronDown/Plus/GitMerge/Trash2/Check
-  - StatusBar: GitBranch/Circle
-  - CommitLog: Tag
-  - ForensicsDashboard: TrendingUp/Flame/Map/Users + CardMeta 패턴
 - **Diff virtualization** (`react-window` 2.x): 400줄 미만은 일반 렌더링 (복사/드래그 보존), 이상은 List로 virtualize + "virtualized · N lines" 배지
 - **CSS 디자인 토큰** 보완: `--radius-sm/lg`, `--shadow-sm/md/lg`, `--space-1~6`, `--transition-fast`
 
 ### v0.1.0 배포 ✅
 - `gh release create v0.1.0` + NSIS/MSI 첨부
-- Release 페이지: https://github.com/cho1124/GitScope/releases/tag/v0.1.0
 
 ### v0.1.1 핫픽스 ✅
 - **증상**: Windows에서 설치 후 실행 시 검은 CMD 창이 무한히 깜빡임
 - **원인**: Rust `std::process::Command`가 Windows에서 기본적으로 새 콘솔을 띄움. StatusBar 5초 폴링 + Forensics 스캔이 계속 돌아서 창이 번쩍
 - **해결**: `run_git` 헬퍼에 `CREATE_NO_WINDOW (0x08000000)` creation_flag 추가
-  ```rust
-  #[cfg(target_os = "windows")]
-  cmd.creation_flags(CREATE_NO_WINDOW);
-  ```
 - 모든 git 호출이 `run_git` 경유이므로 한 지점 수정으로 전역 적용
 - `tauri.conf.json`의 `beforeBuildCommand: "npm run build"` 재귀 버그 수정 (→ `npm run vite:build`)
 
+### Phase 7-1 — Forensics 진행률 스트리밍 ✅
+40GB 레포에서 첫 스캔 시 언제 끝나는지 모르던 문제 해결.
+- **`ProgressEvent`** enum: `counting / scanning{current,total} / aggregating / cacheHit`
+- `count_commits`: `git rev-list --count` 으로 총 커밋 수 선행 집계
+- `scan_log_streaming`: `git log --numstat` 을 `Command::spawn + BufReader::lines`로 라인 단위 스트리밍
+- 1% 간격 또는 100 커밋마다 `tauri::ipc::Channel::send(...)` 발행
+- `ensure_scanned`는 **lock 유지 상태**로 scan → 뒤따르는 카드는 cache-hit로 즉시 완료 (중복 스캔 방지)
+- React: `AsyncState<T>` 에 `progress?: ProgressEvent` 추가, `CardWrapper`에 단계별 메시지 + progress bar
+- CSS: `.progress-bar` + indeterminate 애니메이션
+
+### Phase 7-2 — 테마 전환 (Catppuccin 4 flavor) ✅
+- `global.css`: `:root` 구조 토큰 + 테마 블록 분리
+  - `[data-theme="mocha"]` (default) / `latte` / `frappe` / `macchiato`
+  - 공식 Catppuccin 팔레트 기반 14개 색 토큰 매핑
+- `ThemeSelector.tsx` 신규: Palette 아이콘 드롭다운
+  - 외부 클릭 / Esc 로 닫힘, listbox/option role + aria-selected
+  - 체크 아이콘으로 현재 테마 표시
+- `main.tsx`: React 렌더 전 initial theme 적용 (flash 방지)
+- localStorage `gitscope.theme` 에 선호 저장
+
+### Phase 9-A/B — 심볼 단위 히스토리 (GitScope 원래 차별점) ✅
+일반 Git GUI에 없는 "함수/클래스 생애주기" 뷰.
+- Rust 크레이트: `tree-sitter 0.26`, `tree-sitter-typescript 0.23`, `tree-sitter-rust 0.24`
+- **`symbols.rs`** 신규 모듈:
+  - `get_symbols(filePath)`: Tree-sitter AST 파싱 → 심볼 목록 (name / kind / startLine / endLine)
+  - `get_symbol_history(filePath, startLine, endLine)`: `git log -L <start>,<end>:<file>` 실행 → CommitInfo 배열
+    (라인 범위 기반이라 git이 내부적으로 리네임/이동 자동 추적)
+- `git.rs`: `CommitInfo` 필드 pub 변경 (symbols.rs 재사용)
+- React: `api.ts`에 `Symbol` 타입 + 2개 커맨드 / `FileHistory.tsx` 상단에 심볼 드롭다운 통합
+- kind별 색상: function/method → blue, class/struct/record → mauve, interface/trait → yellow, enum → peach, impl → green, type → red, mod → secondary
+
+### Phase 9-C — Python + C# 지원 확장 ✅
+M823 Unity(C#) 프로젝트 같은 실제 작업물에서 심볼 단위 히스토리 동작.
+- `tree-sitter-python 0.25` + `tree-sitter-c-sharp 0.23` 크레이트 추가
+- Python 쿼리: function_definition / class_definition + decorated 래퍼
+- C# 쿼리: method / class / struct / interface / enum / constructor / record / property
+- 확장자 매핑: `.py/.pyi → Python`, `.cs → C#`
+
 ---
 
-## 남은 계획 (Phase 7 이후)
+## 남은 계획 (Phase 8 이후)
 
-### 스크린샷 + README 업데이트 (다음 세션 필수)
-- 앱 실행 스크린샷 촬영: 웰컴 / 커밋 로그 / 변경사항 / Stash / Code Forensics
-- README의 `> TODO: 스크린샷` 섹션 교체
+### 스크린샷 + README 업데이트
+- 앱 실행 스크린샷 촬영: 웰컴 / 커밋 로그 / 변경사항 / Stash / Code Forensics / **심볼 단위 히스토리 드롭다운** / 테마 4종
+- UI가 Phase 8에서 또 변경될 수 있으니 최종 후 일괄 촬영
 
-### Forensics 진행률 이벤트 (Phase 7)
-- 현재는 스캔 중 spinner만 표시, 대용량 레포에서 언제 끝나는지 모름
-- Tauri `ipc::Channel` 또는 `emit` 로 진행률 스트리밍
-  - Rust: 커밋 파싱 루프에서 every 1000 commits emit
-  - React: 카드별 진행률 바 표시
+### Phase 9-D — 리네임/이동 추적 (우선순위 낮음)
+- `git log -L`이 이미 기본 라인 추적은 해주고 있음
+- 추가 필요성: 파일 자체가 이동/리네임됐을 때 AST diff 기반 매칭
+- 구현: 각 커밋 전후 AST 비교 → 동일 구조 노드 매칭
 
-### 테마 시스템 (Phase 7)
-- Catppuccin Mocha 고정 → Latte (light), Frappe, Macchiato 옵션
-- 토큰화는 되어 있음 (`--bg-primary` 등), 테마 선택 UI만 추가
-- localStorage 또는 AppData에 선호 저장
-
-### 고급 Git 기능 (Phase 8)
-- `rebase` — interactive 모드는 모달로, 비-interactive는 바로
-- `cherry-pick` — 커밋 로그에서 우클릭
-- merge conflict 해결 UI — 3-way diff 뷰
+### Phase 8 — 고급 Git 기능
+- `cherry-pick` — 커밋 로그에서 우클릭 or 컨텍스트 버튼 (가벼움, 우선순위 높음)
 - `reset` (soft/mixed/hard) — 위험 작업이라 ConfirmModal 필수
-
-### 원래 구상 되찾기 — 심볼 단위 히스토리 (Phase 9+)
-- 적대적 검증 당시 미룬 핵심 차별점
-- `git log -L :funcName:file` 래핑 → 함수 단위 히스토리 타임라인
-- Tree-sitter 통합 (기본 언어 2-3개: TS/Python/C# 순서)
-- 리네임 추적 3단계 중 2단계(AST diff)까지 구현
+- `rebase` — interactive 모드는 모달 리오더 UI, 비-interactive는 바로
+- merge conflict 해결 UI — 3-way diff 뷰 (크고 복잡)
 
 ### 기타 백로그
 - **Git LFS / sparse-checkout** 지원
@@ -217,19 +231,19 @@ gh release create vX.Y.Z \
 ## 알려진 이슈
 
 ### 1. 40GB 레포 첫 로드 성능
-**상태**: 일부 해결 (FileTree lazy loading 완료).
-**남은 작업**: Forensics 첫 스캔 시간이 여전히 긺 → Phase 7 진행률 표시로 UX 개선 필요.
+**상태**: 많이 해결됨.
+- FileTree lazy loading (Phase 4-2) → 파일 트리 즉시 응답
+- Forensics 진행률 스트리밍 (Phase 7-1) → 스캔 중 진행도 시각화
+- HEAD 기반 캐싱 (Phase 3) → 재방문 즉시 응답
 
 ### 2. Windows 코드 서명 없음
 **증상**: 설치 시 SmartScreen "알 수 없는 게시자" 경고.
 **우회**: "추가 정보" → "실행".
 **근본 해결**: Authenticode 인증서 (~연 $75-300). 개인 프로젝트에는 과함.
 
-### 3. FileHistory onClick (P2 잔여)
-**상태**: Phase 5에서 해결 완료 (App.tsx에서 `onSelectCommit` 핸들러 연결).
-
-### 4. confirm/alert native dialog
-**상태**: Phase 5-2에서 해결 완료 (ConfirmModal + Toast).
+### 3. Claude Code 백그라운드로 `tauri dev` 띄우기 불안정
+dev 서버를 Claude Code의 `run_in_background`로 띄우면 몇 번 재실행 후 exit code 0으로 조기 종료 (창은 잠시 뜨거나 아예 안 뜸). 좀비 `node.exe` 프로세스가 누적되면 더 불안정.
+**우회**: 사용자가 터미널(PowerShell/bash)에서 직접 `npm run dev` 실행.
 
 ---
 
@@ -252,6 +266,7 @@ gh release create vX.Y.Z \
 | Working tree diff 없음 | ✅ Phase 4-3 |
 | stash/tag/merge | ✅ Phase 4-1, 4-3 |
 | Forensics 카드별 독립 로딩 | ✅ Phase 5 |
+| Forensics 진행률 표시 | ✅ Phase 7-1 |
 | "열는 중" 오타 | ✅ 제거됨 |
 
 ### P2 (폴리시)
@@ -266,14 +281,14 @@ gh release create vX.Y.Z \
 | StatusBar 변경 카운트 poll 없음 | ✅ Phase 5 (5초 polling) |
 | confirm() native dialog | ✅ Phase 5-2 (ConfirmModal) |
 | Windows CMD 창 번쩍임 (설치 후 발견) | ✅ v0.1.1 (CREATE_NO_WINDOW) |
+| 테마 고정 (Catppuccin Mocha만) | ✅ Phase 7-2 (4 flavor) |
 
-### 잔여 (Phase 7+)
+### 잔여 / 확장
 | 항목 | 상태 |
 |---|---|
-| Forensics 진행률 이벤트 | ⏳ Phase 7 |
-| 테마 전환 | ⏳ Phase 7 |
-| rebase/cherry-pick/reset | ⏳ Phase 8 |
-| 심볼 단위 히스토리 (원안) | ⏳ Phase 9+ |
+| 심볼 단위 히스토리 (원안) | ✅ Phase 9-A/B/C (TS/TSX/JS/Rust/Python/C#) |
+| AST diff 기반 리네임 추적 | ⏳ Phase 9-D |
+| rebase/cherry-pick/reset/conflict UI | ⏳ Phase 8 |
 | macOS/Linux 빌드 | ⏳ 추후 |
 
 ---
@@ -282,10 +297,11 @@ gh release create vX.Y.Z \
 
 ### Rust 모듈 간 경계
 - `lib.rs`는 **entry + AppState 정의 + 커맨드 등록**만. 로직 X.
-- `git.rs`의 `with_repo` / `run_git` 헬퍼는 `pub`로 export → `forensics.rs` / `stash.rs`에서 재사용.
+- `git.rs`의 `with_repo` / `run_git` / `CommitInfo`(pub)는 `forensics.rs` / `stash.rs` / `symbols.rs` 에서 재사용.
 - `forensics.rs`의 `CachedScan`은 `pub`로 export → `lib.rs`의 AppState에서 `Mutex<Option<CachedScan>>`로 보유.
 - `recent.rs`: AppData 경로는 `dirs::config_dir()`, 파일 `GitScope/recent.json`. 존재하지 않는 경로는 읽을 때 자동 제거.
 - `stash.rs`: 모든 git 호출은 `git::run_git` 경유 → CMD 창 회피 플래그 자동 적용.
+- `symbols.rs`: Tree-sitter 파서 + 언어별 쿼리. `git log -L` 출력은 `COMMIT_SEP` 기반 자체 파서(`parse_symbol_log`)로 처리.
 
 ### Tauri serde 네이밍 규칙
 - 대부분 struct에 `#[serde(rename_all = "camelCase")]` 붙어 있음 → TS는 camelCase로 받음.
@@ -296,6 +312,8 @@ gh release create vX.Y.Z \
 - Phase 5에서 모든 DTO 타입을 export하도록 정리.
 - 컴포넌트에서 `import { type RepoInfo, type StatusInfo, ... } from '../api'` 형태로 재사용.
 - `ApiResult<T> = { ok: true, data: T } | { ok: false, error: string }` 판별 유니언.
+- Phase 7-1: `ProgressEvent` 유니언 타입 추가 + 4개 Forensics API에 `onProgress` 콜백 옵션.
+- Phase 9: `Symbol` 타입 + `getSymbols` / `getSymbolHistory`.
 
 ### Windows CMD 창 회피 (v0.1.1)
 ```rust
@@ -317,6 +335,8 @@ pub fn run_git(path: &PathBuf, args: &[&str]) -> Result<String, String> {
 }
 ```
 
+`scan_log_streaming`(symbols/forensics)은 `Command::spawn` 직접 사용 → 동일 creation_flag 적용.
+
 ### 토스트 + 확인 모달 사용법
 ```tsx
 // Provider는 main.tsx에서 감싸고 있음
@@ -337,6 +357,13 @@ const ok = await confirm({
 })
 ```
 
+### 심볼 파싱 + 쿼리 패턴 (Phase 9)
+```rust
+// 쿼리는 (node kind ... @name) @kind 패턴
+// @name은 심볼 이름 추출, @kind 는 분류 + 라인 범위
+// FileHistory.tsx의 KIND_COLORS 매핑과 맞춤
+```
+
 ---
 
 ## 다음 세션 시작 시 권장 순서
@@ -345,9 +372,20 @@ const ok = await confirm({
 2. `npm install` (필요 시)
 3. `npm run dev`로 창 뜨는지 확인
 4. 이 파일(DEVELOPMENT.md)을 Claude에게 읽히기:
-   > "GitScope 이어서 작업. DEVELOPMENT.md 읽어봐줘. Phase 7부터 진행할거야."
-5. 먼저 스크린샷 촬영 → README TODO 섹션 교체
-6. Phase 7(진행률 이벤트 + 테마) 착수
+   > "GitScope 이어서 작업. DEVELOPMENT.md 읽어봐줘. Phase 8 (rebase/cherry-pick/reset) 부터 진행할거야."
+5. Phase 8 / 9-D / 스크린샷 중 택일
+
+### v0.2.0 릴리즈 (권장)
+Phase 7 + 9 내용이 충분히 minor bump 감. 언제든:
+```bash
+# Cargo.toml / package.json / tauri.conf.json 의 version을 0.2.0 으로 변경
+npm run build
+gh release create v0.2.0 \
+  "src-tauri/target/release/bundle/nsis/GitScope_0.2.0_x64-setup.exe" \
+  "src-tauri/target/release/bundle/msi/GitScope_0.2.0_x64_en-US.msi" \
+  --title "GitScope v0.2.0" \
+  --notes "Phase 7 (Forensics 진행률 + 테마 전환) + Phase 9 (심볼 단위 히스토리)"
+```
 
 ---
 
