@@ -10,12 +10,15 @@ interface Props {
 const KIND_COLORS: Record<string, string> = {
   function: 'var(--accent)',
   method: 'var(--accent)',
+  constructor: 'var(--accent)',
   class: 'var(--mauve)',
   struct: 'var(--mauve)',
+  record: 'var(--mauve)',
   interface: 'var(--yellow)',
   trait: 'var(--yellow)',
   enum: 'var(--peach)',
   impl: 'var(--green)',
+  property: 'var(--green)',
   type: 'var(--red)',
   mod: 'var(--text-secondary)',
 }
@@ -139,7 +142,7 @@ export function FileHistory({ filePath, selectedCommit, onSelectCommit }: Props)
               fontStyle: 'italic',
             }}
           >
-            이 파일에서 탐지된 심볼이 없습니다 (지원 언어: TS/TSX/JS/Rust)
+            이 파일에서 탐지된 심볼이 없습니다 (지원 언어: TS/TSX/JS/Rust/Python/C#)
           </div>
         )}
       </div>

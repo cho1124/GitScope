@@ -31,6 +31,10 @@ fn language_for_file(file_path: &str) -> Option<(Language, &'static str)> {
         Some((tree_sitter_typescript::LANGUAGE_TSX.into(), "tsx"))
     } else if lower.ends_with(".rs") {
         Some((tree_sitter_rust::LANGUAGE.into(), "rust"))
+    } else if lower.ends_with(".py") || lower.ends_with(".pyi") {
+        Some((tree_sitter_python::LANGUAGE.into(), "python"))
+    } else if lower.ends_with(".cs") {
+        Some((tree_sitter_c_sharp::LANGUAGE.into(), "csharp"))
     } else {
         None
     }
@@ -60,6 +64,28 @@ fn query_for_language(lang_name: &str) -> &'static str {
 (trait_item name: (type_identifier) @name) @trait
 (impl_item type: (type_identifier) @name) @impl
 (mod_item name: (identifier) @name) @mod
+"#
+        }
+        "python" => {
+            r#"
+(function_definition name: (identifier) @name) @function
+(class_definition name: (identifier) @name) @class
+(decorated_definition
+  definition: (function_definition name: (identifier) @name)) @function
+(decorated_definition
+  definition: (class_definition name: (identifier) @name)) @class
+"#
+        }
+        "csharp" => {
+            r#"
+(method_declaration name: (identifier) @name) @method
+(class_declaration name: (identifier) @name) @class
+(struct_declaration name: (identifier) @name) @struct
+(interface_declaration name: (identifier) @name) @interface
+(enum_declaration name: (identifier) @name) @enum
+(constructor_declaration name: (identifier) @name) @constructor
+(record_declaration name: (identifier) @name) @record
+(property_declaration name: (identifier) @name) @property
 "#
         }
         _ => "",
