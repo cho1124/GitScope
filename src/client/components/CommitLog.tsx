@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
-import { Tag, Cherry, AlertTriangle, Play, X as XIcon } from 'lucide-react'
+import { Tag, Cherry, AlertTriangle, Play, X as XIcon, RotateCcw, AlertOctagon } from 'lucide-react'
 import { api, type CommitInfo } from '../api'
 import { buildGraph, maxLaneCount } from '../lib/graph'
 import { CommitGraph } from './CommitGraph'
@@ -60,6 +60,44 @@ interface CtxMenu {
   x: number
   y: number
   isMerge: boolean
+}
+
+function MenuButton({
+  icon,
+  label,
+  onClick,
+  danger,
+}: {
+  icon: React.ReactNode
+  label: string
+  onClick: () => void
+  danger?: boolean
+}) {
+  return (
+    <button
+      role="menuitem"
+      onClick={onClick}
+      style={{
+        display: 'flex',
+        alignItems: 'center',
+        gap: '8px',
+        width: '100%',
+        padding: '6px 10px',
+        background: 'none',
+        border: 'none',
+        color: danger ? 'var(--red)' : 'var(--text-primary)',
+        textAlign: 'left',
+        cursor: 'pointer',
+        borderRadius: 'calc(var(--radius) - 2px)',
+        fontSize: '12px',
+      }}
+      onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--bg-hover)')}
+      onMouseLeave={(e) => (e.currentTarget.style.background = 'none')}
+    >
+      {icon}
+      <span>{label}</span>
+    </button>
+  )
 }
 
 export function CommitLog({ selectedCommit, onSelectCommit, file }: Props) {
@@ -170,6 +208,30 @@ export function CommitLog({ selectedCommit, onSelectCommit, file }: Props) {
     }
     await reload()
     await refreshCherryStatus()
+  }
+
+  const handleReset = async (target: CtxMenu, mode: 'soft' | 'mixed' | 'hard') => {
+    setCtxMenu(null)
+    const variant = mode === 'hard' ? 'danger' : 'warn'
+    const description: Record<typeof mode, string> = {
+      soft: '현재 HEAD만 이 커밋으로 이동합니다. staging과 working tree의 변경사항은 그대로 보존됩니다.',
+      mixed: '현재 HEAD를 이 커밋으로 이동하고 staging을 비웁니다. working tree의 변경사항은 보존됩니다.',
+      hard: '⚠️ HEAD / staging / working tree 를 모두 이 커밋 상태로 되돌립니다.\n\n커밋되지 않은 모든 변경사항이 영구적으로 사라집니다.',
+    }
+    const ok = await confirm({
+      title: `Reset (${mode})`,
+      message: `${description[mode]}\n\n대상: ${target.hashShort}`,
+      variant,
+      confirmLabel: mode === 'hard' ? 'Hard reset' : `Reset (${mode})`,
+    })
+    if (!ok) return
+    const result = await api.reset(target.hash, mode)
+    if (result.ok) {
+      toast.success(`Reset (${mode}) 완료`)
+    } else {
+      toast.error(`Reset 실패: ${result.error}`)
+    }
+    await reload()
   }
 
   const loadMore = useCallback(async () => {
@@ -397,28 +459,30 @@ export function CommitLog({ selectedCommit, onSelectCommit, file }: Props) {
             fontSize: '12px',
           }}
         >
-          <button
-            role="menuitem"
+          <MenuButton
+            icon={<Cherry size={13} strokeWidth={2.5} color="var(--red)" />}
+            label={`Cherry-pick${ctxMenu.isMerge ? ' (merge, -m 1)' : ''}`}
             onClick={() => handleCherryPick(ctxMenu)}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '8px',
-              width: '100%',
-              padding: '6px 10px',
-              background: 'none',
-              border: 'none',
-              color: 'var(--text-primary)',
-              textAlign: 'left',
-              cursor: 'pointer',
-              borderRadius: 'calc(var(--radius) - 2px)',
-            }}
-            onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--bg-hover)')}
-            onMouseLeave={(e) => (e.currentTarget.style.background = 'none')}
-          >
-            <Cherry size={13} strokeWidth={2.5} color="var(--red)" />
-            <span>Cherry-pick {ctxMenu.isMerge ? '(merge, -m 1)' : ''}</span>
-          </button>
+          />
+
+          <div style={{ height: 1, background: 'var(--border)', margin: '4px 0' }} />
+
+          <MenuButton
+            icon={<RotateCcw size={13} strokeWidth={2.5} color="var(--yellow)" />}
+            label="Reset (soft) — 변경사항 보존"
+            onClick={() => handleReset(ctxMenu, 'soft')}
+          />
+          <MenuButton
+            icon={<RotateCcw size={13} strokeWidth={2.5} color="var(--yellow)" />}
+            label="Reset (mixed) — staging 비움"
+            onClick={() => handleReset(ctxMenu, 'mixed')}
+          />
+          <MenuButton
+            icon={<AlertOctagon size={13} strokeWidth={2.5} color="var(--red)" />}
+            label="Reset (hard) — 모든 변경 삭제"
+            onClick={() => handleReset(ctxMenu, 'hard')}
+            danger
+          />
         </div>
       )}
     </>

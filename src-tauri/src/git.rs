@@ -443,6 +443,22 @@ pub fn cherry_pick_continue(state: State<AppState>) -> Result<(), String> {
     })
 }
 
+/// 현재 브랜치 HEAD를 지정한 커밋으로 reset.
+/// - mode: "soft" (HEAD만 이동) | "mixed" (HEAD + 스테이징 초기화) | "hard" (HEAD + 스테이징 + 워킹트리 초기화, 위험)
+#[tauri::command]
+pub fn reset(hash: String, mode: String, state: State<AppState>) -> Result<(), String> {
+    with_repo(&state, |path| {
+        let mode_flag = match mode.as_str() {
+            "soft" => "--soft",
+            "mixed" => "--mixed",
+            "hard" => "--hard",
+            _ => return Err(format!("알 수 없는 reset 모드: {}", mode)),
+        };
+        run_git(path, &["reset", mode_flag, &hash])?;
+        Ok(())
+    })
+}
+
 /// cherry-pick 진행 중 여부 (.git/CHERRY_PICK_HEAD 존재 검사)
 #[tauri::command]
 pub fn cherry_pick_in_progress(state: State<AppState>) -> Result<bool, String> {

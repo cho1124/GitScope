@@ -174,6 +174,10 @@ export const api = {
   cherryPickContinue: () => call<void>('cherry_pick_continue'),
   cherryPickInProgress: () => call<boolean>('cherry_pick_in_progress'),
 
+  // ── Reset (Phase 8-B) ────────────────────────────────
+  reset: (hash: string, mode: 'soft' | 'mixed' | 'hard') =>
+    call<void>('reset', { hash, mode }),
+
   push: () => call<void>('push'),
   pull: () => call<void>('pull'),
 

@@ -46,6 +46,7 @@ pub fn run() {
             git::cherry_pick_abort,
             git::cherry_pick_continue,
             git::cherry_pick_in_progress,
+            git::reset,
             git::push,
             git::pull,
             git::get_file_history,
