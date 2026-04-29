@@ -10,12 +10,15 @@ interface Props {
   onApplied: () => void
 }
 
-type Action = 'pick' | 'reword' | 'drop'
+type Action = 'pick' | 'reword' | 'squash' | 'fixup' | 'drop'
 
 interface Item extends CommitInfo {
   action: Action
-  rewordMessage: string  // reword 액션에서만 사용. 초기값은 원 커밋 메시지.
+  // reword/squash 에서 새 커밋 메시지로 사용. 다른 action은 무시. 초기값은 원 커밋 메시지.
+  editMessage: string
 }
+
+const NEEDS_MESSAGE: Action[] = ['reword', 'squash']
 
 export function InteractiveRebaseModal({ from, fromShort, onClose, onApplied }: Props) {
   const [items, setItems] = useState<Item[]>([])
@@ -33,7 +36,7 @@ export function InteractiveRebaseModal({ from, fromShort, onClose, onApplied }: 
     setLoading(true)
     api.listCommitsInRange(from).then(r => {
       if (r.ok) {
-        setItems(r.data.map(c => ({ ...c, action: 'pick' as Action, rewordMessage: c.message })))
+        setItems(r.data.map(c => ({ ...c, action: 'pick' as Action, editMessage: c.message })))
       } else {
         toast.error(`커밋 로드 실패: ${r.error}`)
         onClose()
@@ -70,9 +73,9 @@ export function InteractiveRebaseModal({ from, fromShort, onClose, onApplied }: 
     setItems(next)
   }
 
-  const setRewordMessage = (idx: number, msg: string) => {
+  const setEditMessage = (idx: number, msg: string) => {
     const next = [...items]
-    next[idx] = { ...next[idx], rewordMessage: msg }
+    next[idx] = { ...next[idx], editMessage: msg }
     setItems(next)
   }
 
@@ -81,7 +84,7 @@ export function InteractiveRebaseModal({ from, fromShort, onClose, onApplied }: 
     const operations = items.map(i => ({
       hash: i.hash,
       action: i.action,
-      message: i.action === 'reword' ? i.rewordMessage : undefined,
+      message: NEEDS_MESSAGE.includes(i.action) ? i.editMessage : undefined,
     }))
     const r = await api.interactiveRebase(from, operations)
     setApplying(false)
@@ -95,10 +98,16 @@ export function InteractiveRebaseModal({ from, fromShort, onClose, onApplied }: 
 
   const keepCount = items.filter(i => i.action !== 'drop').length
   const rewordCount = items.filter(i => i.action === 'reword').length
+  const squashCount = items.filter(i => i.action === 'squash').length
+  const fixupCount = items.filter(i => i.action === 'fixup').length
   const dropCount = items.filter(i => i.action === 'drop').length
-  const hasInvalidReword = items.some(
-    i => i.action === 'reword' && i.rewordMessage.trim() === '',
+  const hasInvalidMessage = items.some(
+    i => NEEDS_MESSAGE.includes(i.action) && i.editMessage.trim() === '',
   )
+  // 첫 적용 위치(이전 적용 op 없음)에 squash/fixup이 오는지 검사
+  const firstAppliedIdx = items.findIndex(i => i.action !== 'drop')
+  const firstAction = firstAppliedIdx >= 0 ? items[firstAppliedIdx].action : null
+  const firstNeedsPrior = firstAction === 'squash' || firstAction === 'fixup'
 
   return (
     <div
@@ -158,9 +167,24 @@ export function InteractiveRebaseModal({ from, fromShort, onClose, onApplied }: 
           <code style={{ color: 'var(--mauve)' }}>{fromShort}</code> 위로 재적용 ·
           {' '}<span style={{ color: 'var(--green)' }}>{keepCount} 유지</span>
           {rewordCount > 0 && <>{' / '}<span style={{ color: 'var(--mauve)' }}>{rewordCount} reword</span></>}
+          {squashCount > 0 && <>{' / '}<span style={{ color: 'var(--peach)' }}>{squashCount} squash</span></>}
+          {fixupCount > 0 && <>{' / '}<span style={{ color: 'var(--peach)' }}>{fixupCount} fixup</span></>}
           {' / '}<span style={{ color: 'var(--red)' }}>{dropCount} 드롭</span>
           {' · 충돌 시 자동 롤백'}
         </div>
+        {firstNeedsPrior && (
+          <div style={{
+            fontSize: 11,
+            color: 'var(--red)',
+            background: 'rgba(243, 139, 168, 0.1)',
+            border: '1px solid var(--red)',
+            borderRadius: 'calc(var(--radius) - 2px)',
+            padding: '6px 10px',
+            marginBottom: 12,
+          }}>
+            ⚠ 첫 적용 위치가 squash/fixup 입니다. 결합할 이전 커밋이 없어 적용 시 거부됩니다. 위 커밋을 위로 옮기거나 pick으로 바꾸세요.
+          </div>
+        )}
 
         <div style={{
           flex: 1,
@@ -183,7 +207,20 @@ export function InteractiveRebaseModal({ from, fromShort, onClose, onApplied }: 
               {items.map((item, idx) => {
                 const isDrop = item.action === 'drop'
                 const isReword = item.action === 'reword'
-                const rewordEmpty = isReword && item.rewordMessage.trim() === ''
+                const isSquash = item.action === 'squash'
+                const isFixup = item.action === 'fixup'
+                const needsMessage = isReword || isSquash
+                const messageEmpty = needsMessage && item.editMessage.trim() === ''
+                const bg =
+                  isDrop ? 'rgba(243, 139, 168, 0.06)' :
+                  isReword ? 'rgba(203, 166, 247, 0.06)' :
+                  isSquash || isFixup ? 'rgba(250, 179, 135, 0.06)' :
+                  'transparent'
+                const dropdownColor =
+                  isDrop ? 'var(--red)' :
+                  isReword ? 'var(--mauve)' :
+                  isSquash || isFixup ? 'var(--peach)' :
+                  'var(--text-primary)'
                 return (
                   <li
                     key={item.hash}
@@ -194,7 +231,7 @@ export function InteractiveRebaseModal({ from, fromShort, onClose, onApplied }: 
                       padding: '6px 8px',
                       borderBottom: idx < items.length - 1 ? '1px solid var(--border)' : 'none',
                       fontSize: 12,
-                      background: isDrop ? 'rgba(243, 139, 168, 0.06)' : isReword ? 'rgba(203, 166, 247, 0.06)' : 'transparent',
+                      background: bg,
                       opacity: isDrop ? 0.55 : 1,
                     }}
                   >
@@ -224,7 +261,7 @@ export function InteractiveRebaseModal({ from, fromShort, onClose, onApplied }: 
                           background: 'var(--bg-surface)',
                           border: '1px solid var(--border)',
                           borderRadius: 3,
-                          color: isDrop ? 'var(--red)' : isReword ? 'var(--mauve)' : 'var(--text-primary)',
+                          color: dropdownColor,
                           fontSize: 11,
                           fontFamily: 'var(--font-mono)',
                           padding: '2px 4px',
@@ -233,6 +270,8 @@ export function InteractiveRebaseModal({ from, fromShort, onClose, onApplied }: 
                       >
                         <option value="pick">pick</option>
                         <option value="reword">reword</option>
+                        <option value="squash">squash</option>
+                        <option value="fixup">fixup</option>
                         <option value="drop">drop</option>
                       </select>
                       <code style={{ color: 'var(--accent)', fontFamily: 'var(--font-mono)', fontSize: 11 }}>
@@ -250,17 +289,17 @@ export function InteractiveRebaseModal({ from, fromShort, onClose, onApplied }: 
                       </span>
                       <span style={{ color: 'var(--text-muted)', fontSize: 10 }}>{item.author}</span>
                     </div>
-                    {isReword && (
+                    {needsMessage && (
                       <textarea
-                        value={item.rewordMessage}
-                        onChange={(e) => setRewordMessage(idx, e.target.value)}
+                        value={item.editMessage}
+                        onChange={(e) => setEditMessage(idx, e.target.value)}
                         disabled={applying}
                         rows={2}
-                        placeholder="새 커밋 메시지"
+                        placeholder={isSquash ? '결합 후 커밋 메시지 (이전과 합칠 내용 직접 작성)' : '새 커밋 메시지'}
                         style={{
-                          marginLeft: 56,  // dropdown 아래 정렬용
+                          marginLeft: 56,
                           background: 'var(--bg-surface)',
-                          border: `1px solid ${rewordEmpty ? 'var(--red)' : 'var(--border)'}`,
+                          border: `1px solid ${messageEmpty ? 'var(--red)' : 'var(--border)'}`,
                           borderRadius: 3,
                           color: 'var(--text-primary)',
                           fontSize: 11,
@@ -284,8 +323,12 @@ export function InteractiveRebaseModal({ from, fromShort, onClose, onApplied }: 
           <button
             className="btn btn-sm"
             onClick={apply}
-            disabled={applying || loading || items.length === 0 || keepCount === 0 || hasInvalidReword}
-            title={hasInvalidReword ? 'reword 메시지를 입력하세요' : undefined}
+            disabled={applying || loading || items.length === 0 || keepCount === 0 || hasInvalidMessage || firstNeedsPrior}
+            title={
+              hasInvalidMessage ? 'reword/squash 메시지를 입력하세요' :
+              firstNeedsPrior ? '첫 적용 위치는 squash/fixup 불가' :
+              undefined
+            }
             style={{ background: 'var(--mauve)', color: 'var(--bg-primary)', borderColor: 'var(--mauve)' }}
           >
             {applying ? (

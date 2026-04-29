@@ -190,7 +190,11 @@ export const api = {
     call<CommitInfo[]>('list_commits_in_range', { from }),
   interactiveRebase: (
     from: string,
-    operations: Array<{ hash: string; action: 'pick' | 'reword' | 'drop'; message?: string }>,
+    operations: Array<{
+      hash: string
+      action: 'pick' | 'reword' | 'squash' | 'fixup' | 'drop'
+      message?: string
+    }>,
   ) => call<void>('interactive_rebase', { from, operations }),
 
   push: () => call<void>('push'),

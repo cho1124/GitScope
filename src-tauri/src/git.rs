@@ -466,14 +466,14 @@ pub fn list_commits_in_range(from: String, state: State<AppState>) -> Result<Vec
 #[serde(rename_all = "camelCase")]
 pub struct RebaseOp {
     pub hash: String,
-    /// "pick" | "reword" | "drop"
+    /// "pick" | "reword" | "squash" | "fixup" | "drop"
     pub action: String,
-    /// reword 시 새 커밋 메시지. 다른 action은 무시.
+    /// reword/squash 시 새 커밋 메시지. pick/fixup/drop은 무시.
     #[serde(default)]
     pub message: Option<String>,
 }
 
-/// Interactive rebase: reorder + drop + reword.
+/// Interactive rebase: reorder + drop + reword + squash + fixup.
 /// 안전장치: 시작 시 HEAD를 저장 → 실패 시 cherry-pick abort + reset --hard 로 원상 복구.
 /// 충돌 시 부분 상태 노출 없이 깔끔히 롤백.
 #[tauri::command]
@@ -496,15 +496,52 @@ pub fn interactive_rebase(
             );
         }
 
-        // 3. reword 사전 검증 (실행 전에 메시지 누락 잡아내기 — 부분 적용 후 롤백 비용 절약)
+        // 3. 사전 검증
+        // - reword/squash: 메시지 누락
+        // - squash/fixup: 첫 적용 위치(이전 적용 커밋 없음)에 올 수 없음
+        let mut prior_applied = false;
         for op in &operations {
-            if op.action == "reword" {
-                let msg = op.message.as_deref().map(str::trim).unwrap_or("");
-                if msg.is_empty() {
-                    return Err(format!(
-                        "{} reword 작업에 메시지가 비어있습니다.",
-                        &op.hash[..7.min(op.hash.len())]
-                    ));
+            match op.action.as_str() {
+                "pick" | "reword" => {
+                    if op.action == "reword" {
+                        let msg = op.message.as_deref().map(str::trim).unwrap_or("");
+                        if msg.is_empty() {
+                            return Err(format!(
+                                "{} reword 작업에 메시지가 비어있습니다.",
+                                &op.hash[..7.min(op.hash.len())]
+                            ));
+                        }
+                    }
+                    prior_applied = true;
+                }
+                "squash" => {
+                    let msg = op.message.as_deref().map(str::trim).unwrap_or("");
+                    if msg.is_empty() {
+                        return Err(format!(
+                            "{} squash 작업에 결합 메시지가 비어있습니다.",
+                            &op.hash[..7.min(op.hash.len())]
+                        ));
+                    }
+                    if !prior_applied {
+                        return Err(format!(
+                            "{} squash는 첫 위치에 올 수 없습니다 (결합 대상 이전 커밋이 없음).",
+                            &op.hash[..7.min(op.hash.len())]
+                        ));
+                    }
+                    prior_applied = true;
+                }
+                "fixup" => {
+                    if !prior_applied {
+                        return Err(format!(
+                            "{} fixup은 첫 위치에 올 수 없습니다 (결합 대상 이전 커밋이 없음).",
+                            &op.hash[..7.min(op.hash.len())]
+                        ));
+                    }
+                    prior_applied = true;
+                }
+                "drop" => {}
+                other => {
+                    return Err(format!("알 수 없는 action: {}", other));
                 }
             }
         }
@@ -539,6 +576,31 @@ pub fn interactive_rebase(
                     let msg = op.message.as_deref().unwrap_or("");
                     if let Err(e) = run_git(path, &["commit", "--amend", "-m", msg]) {
                         return Err(rollback(path, "메시지 amend", &e, &op.hash));
+                    }
+                }
+                "squash" => {
+                    if let Err(e) = run_git(path, &["cherry-pick", &op.hash]) {
+                        return Err(rollback(path, "cherry-pick (squash)", &e, &op.hash));
+                    }
+                    // 직전 커밋과 결합: reset --soft로 이번 cherry-pick 커밋만 풀고 변경사항은 staging에 둠
+                    if let Err(e) = run_git(path, &["reset", "--soft", "HEAD~1"]) {
+                        return Err(rollback(path, "soft reset", &e, &op.hash));
+                    }
+                    let msg = op.message.as_deref().unwrap_or("");
+                    if let Err(e) = run_git(path, &["commit", "--amend", "-m", msg]) {
+                        return Err(rollback(path, "squash amend", &e, &op.hash));
+                    }
+                }
+                "fixup" => {
+                    if let Err(e) = run_git(path, &["cherry-pick", &op.hash]) {
+                        return Err(rollback(path, "cherry-pick (fixup)", &e, &op.hash));
+                    }
+                    if let Err(e) = run_git(path, &["reset", "--soft", "HEAD~1"]) {
+                        return Err(rollback(path, "soft reset (fixup)", &e, &op.hash));
+                    }
+                    // 직전 커밋의 메시지 그대로 유지: --amend --no-edit
+                    if let Err(e) = run_git(path, &["commit", "--amend", "--no-edit"]) {
+                        return Err(rollback(path, "fixup amend", &e, &op.hash));
                     }
                 }
                 "drop" => {
