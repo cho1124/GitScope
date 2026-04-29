@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect } from 'react'
-import { DownloadCloud, ArrowDownToLine, ArrowUpFromLine, RefreshCw, Settings as SettingsIcon } from 'lucide-react'
+import { Settings as SettingsIcon } from 'lucide-react'
 import { api, type RepoInfo } from './api'
 import { FileTree } from './components/FileTree'
 import { CommitLog } from './components/CommitLog'
@@ -11,6 +11,7 @@ import { FileHistory } from './components/FileHistory'
 import { BranchSelector } from './components/BranchSelector'
 import { WelcomeScreen } from './components/WelcomeScreen'
 import { RepoSelector } from './components/RepoSelector'
+import { RemoteSyncButton } from './components/RemoteSyncButton'
 import { SettingsModal } from './components/SettingsModal'
 import { useToast } from './components/Toast'
 
@@ -33,7 +34,6 @@ export default function App() {
   const [refreshKey, setRefreshKey] = useState(0)
   const [loading, setLoading] = useState(false)
   const [settingsOpen, setSettingsOpen] = useState(false)
-  const [remoteBusy, setRemoteBusy] = useState<null | 'fetch' | 'pull' | 'push'>(null)
 
   const handleOpenRepo = useCallback(async (path: string) => {
     const trimmed = path.trim()
@@ -76,42 +76,6 @@ export default function App() {
     setRefreshKey(k => k + 1)
   }, [])
 
-  const handleFetch = useCallback(async () => {
-    setRemoteBusy('fetch')
-    const r = await api.fetch()
-    setRemoteBusy(null)
-    if (r.ok) {
-      toast.success('Fetch 완료')
-      setRefreshKey(k => k + 1)
-    } else {
-      toast.error(`Fetch 실패: ${r.error}`)
-    }
-  }, [toast])
-
-  const handlePull = useCallback(async () => {
-    setRemoteBusy('pull')
-    const r = await api.pull()
-    setRemoteBusy(null)
-    if (r.ok) {
-      toast.success('Pull 완료')
-      setRefreshKey(k => k + 1)
-    } else {
-      toast.error(`Pull 실패: ${r.error}`)
-    }
-  }, [toast])
-
-  const handlePush = useCallback(async () => {
-    setRemoteBusy('push')
-    const r = await api.push()
-    setRemoteBusy(null)
-    if (r.ok) {
-      toast.success('Push 완료')
-      setRefreshKey(k => k + 1)
-    } else {
-      toast.error(`Push 실패: ${r.error}`)
-    }
-  }, [toast])
-
   // 키보드 단축키 (Ctrl+1~3 탭 전환, F5 새로고침)
   useEffect(() => {
     if (!repo) return
@@ -150,41 +114,13 @@ export default function App() {
         />
 
         <div style={{
-          display: 'flex',
-          gap: 2,
-          padding: '0 4px',
+          paddingLeft: 8,
           borderLeft: '1px solid var(--border)',
           marginLeft: 4,
         }}>
-          <IconButton
-            icon={<DownloadCloud size={13} />}
-            label="Fetch"
-            shortcut="git fetch --all --prune"
-            onClick={handleFetch}
-            busy={remoteBusy === 'fetch'}
-            disabled={remoteBusy !== null}
-          />
-          <IconButton
-            icon={<ArrowDownToLine size={13} />}
-            label="Pull"
-            shortcut="git pull"
-            onClick={handlePull}
-            busy={remoteBusy === 'pull'}
-            disabled={remoteBusy !== null}
-          />
-          <IconButton
-            icon={<ArrowUpFromLine size={13} />}
-            label="Push"
-            shortcut="git push"
-            onClick={handlePush}
-            busy={remoteBusy === 'push'}
-            disabled={remoteBusy !== null}
-          />
-          <IconButton
-            icon={<RefreshCw size={13} />}
-            label="Refresh"
-            shortcut="F5"
-            onClick={handleRefresh}
+          <RemoteSyncButton
+            refreshKey={refreshKey}
+            onSynced={handleRefresh}
           />
         </div>
 

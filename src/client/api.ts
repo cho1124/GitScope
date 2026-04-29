@@ -48,6 +48,13 @@ export interface BranchInfo {
   all: string[]
 }
 
+export interface RemoteStatus {
+  hasUpstream: boolean
+  upstream: string | null
+  ahead: number
+  behind: number
+}
+
 export interface FileTreeNode {
   name: string
   path: string
@@ -204,6 +211,7 @@ export const api = {
     call<void>('resolve_conflict', { file, strategy }),
 
   fetch: () => call<void>('fetch'),
+  getRemoteStatus: () => call<RemoteStatus>('get_remote_status'),
   push: () => call<void>('push'),
   pull: () => call<void>('pull'),
 

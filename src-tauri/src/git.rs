@@ -766,6 +766,76 @@ pub fn fetch(state: State<AppState>) -> Result<(), String> {
     })
 }
 
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RemoteStatus {
+    /// upstream(@{u}) 가 설정돼 있는지
+    has_upstream: bool,
+    /// 예: "origin/main" — upstream 없으면 None
+    upstream: Option<String>,
+    /// 로컬에만 있는 커밋 수 (push 후보)
+    ahead: u32,
+    /// 원격에만 있는 커밋 수 (pull 후보)
+    behind: u32,
+}
+
+/// 현재 브랜치의 원격 추적 상태 (ahead/behind).
+/// upstream 미설정이거나 fetch 안 한 상태면 has_upstream=false.
+#[tauri::command]
+pub fn get_remote_status(state: State<AppState>) -> Result<RemoteStatus, String> {
+    with_repo(&state, |path| {
+        // upstream 존재 여부 확인
+        let upstream_result =
+            run_git(path, &["rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{u}"]);
+        let upstream = match upstream_result {
+            Ok(s) => {
+                let trimmed = s.trim().to_string();
+                if trimmed.is_empty() {
+                    return Ok(RemoteStatus {
+                        has_upstream: false,
+                        upstream: None,
+                        ahead: 0,
+                        behind: 0,
+                    });
+                }
+                trimmed
+            }
+            Err(_) => {
+                // upstream 없음 (브랜치 새로 만들고 push 전 등)
+                return Ok(RemoteStatus {
+                    has_upstream: false,
+                    upstream: None,
+                    ahead: 0,
+                    behind: 0,
+                });
+            }
+        };
+
+        // ahead/behind 계산: rev-list --left-right --count HEAD...@{u}
+        // 출력 형식: "<ahead>\t<behind>"
+        let counts = run_git(
+            path,
+            &["rev-list", "--left-right", "--count", "HEAD...@{u}"],
+        )?;
+        let mut parts = counts.split_whitespace();
+        let ahead = parts
+            .next()
+            .and_then(|s| s.parse::<u32>().ok())
+            .unwrap_or(0);
+        let behind = parts
+            .next()
+            .and_then(|s| s.parse::<u32>().ok())
+            .unwrap_or(0);
+
+        Ok(RemoteStatus {
+            has_upstream: true,
+            upstream: Some(upstream),
+            ahead,
+            behind,
+        })
+    })
+}
+
 #[tauri::command]
 pub fn push(state: State<AppState>) -> Result<(), String> {
     with_repo(&state, |path| {

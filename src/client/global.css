@@ -126,22 +126,11 @@ body {
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 8px 16px;
+  padding: 12px 16px;
+  min-height: 52px;
   background: var(--bg-secondary);
   border-bottom: 1px solid var(--border);
   user-select: none;
-}
-
-.app-header h1 {
-  font-size: 14px;
-  font-weight: 600;
-  color: var(--accent);
-}
-
-.app-header .repo-path {
-  font-size: 12px;
-  color: var(--text-muted);
-  font-family: var(--font-mono);
 }
 
 .app-body {
