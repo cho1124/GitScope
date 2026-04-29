@@ -9,8 +9,8 @@ Code Forensics 시각화와 **심볼 단위 히스토리**를 내장한 **로컬
 
 ## 다운로드
 
-**[최신 릴리즈 → v0.2.0](https://github.com/cho1124/GitScope/releases/latest)**  
-(Phase 7: Forensics 진행률 + 테마 전환 · Phase 9: 심볼 단위 히스토리 + 브랜치 그래프)
+**[최신 릴리즈 → v0.3.0](https://github.com/cho1124/GitScope/releases/latest)**  
+(Phase 8: 고급 Git 액션 — cherry-pick / reset / rebase / interactive rebase / 충돌 빠른 해결)
 
 | 파일 | 크기 | 설명 |
 |------|------|------|
@@ -44,6 +44,17 @@ Code Forensics 시각화와 **심볼 단위 히스토리**를 내장한 **로컬
 | **C#** | method, class, struct, interface, enum, constructor, record, property |
 
 파일 히스토리 탭에서 심볼을 고르면 **그 심볼이 변경된 커밋만** 필터링됩니다. 리팩토링 히스토리 추적, 특정 함수의 의도 변화 파악, 인수인계에 유용합니다.
+
+### 고급 Git 액션 (v0.3.0 신규) 🆕
+커밋 로그에서 **우클릭** 한 번으로 모든 고급 작업 수행:
+
+| 액션 | 설명 |
+|------|------|
+| **Cherry-pick** | 다른 브랜치 커밋을 현재 브랜치로 적용 · 머지 커밋은 `-m 1` 자동 적용 · 충돌 시 진행 중 배너로 abort/continue |
+| **Reset** (soft / mixed / hard) | HEAD 이동 — soft는 staging 유지, mixed는 staging 비움, **hard는 명시적 데이터 손실 경고** + danger ConfirmModal |
+| **Rebase** (비-interactive) | 현재 브랜치를 선택 커밋 위로 재배치 · 충돌 시 계속 / 건너뛰기 / 중단 3-액션 배너 |
+| **Interactive rebase** ⭐ | 모달로 ↑↓ 재정렬 / drop / **reword** / **squash** (메시지 결합) / **fixup** (메시지 폐기) 5가지 액션 · `git rebase -i` todo 파일 안 쓰고 cherry-pick 체인으로 안전 구현 · 충돌 또는 실패 시 **원본 HEAD로 자동 롤백** |
+| **충돌 빠른 해결** | cherry-pick / rebase 진행 중 충돌 파일 자동 감지 → 파일별 [Take ours] [Take theirs] 버튼으로 즉시 해결 + auto-staging |
 
 ### Code Forensics
 | 분석 | 설명 |
@@ -195,9 +206,16 @@ GitScope/
 | Phase 7-2 | 테마 전환 (Catppuccin 4 flavor) | ✅ |
 | **Phase 9-A/B** | **심볼 단위 히스토리 (Tree-sitter + `git log -L`)** | ✅ |
 | **Phase 9-C** | **Python + C# 언어 지원 확장** | ✅ |
-| Phase 9-D | 리네임/이동 추적 (AST diff) | 🔜 |
-| Phase 8 | 고급 Git (rebase / cherry-pick / reset / 3-way merge) | 🔜 |
-| Final | 스크린샷 + v0.2.0 배포 | 🔜 |
+| Phase 9-D | 리네임/이동 추적 — `git log -L` 가 자동 처리 확인 후 종료 | ✅ |
+| **Phase 8-A** | **Cherry-pick (단일 + 충돌 처리 + merge `-m 1`)** | ✅ |
+| **Phase 8-B** | **Reset (soft / mixed / hard, 위험도 차등 ConfirmModal)** | ✅ |
+| **Phase 8-C** | **Rebase 비-interactive (충돌 시 ProgressBanner)** | ✅ |
+| **Phase 8-D** | **Interactive rebase MVP (reorder + drop, cherry-pick 체인 + 자동 롤백)** | ✅ |
+| **Phase 8-E** | **Interactive rebase reword** | ✅ |
+| **Phase 8-F** | **Interactive rebase squash + fixup** | ✅ |
+| **Phase 8-G-1** | **충돌 ours/theirs 빠른 해결 패널** | ✅ |
+| Phase 8-G-2 | 3-way side-by-side diff viewer (region 단위 해결) | 🔜 |
+| Phase 10 | Knowledge Graph + MCP (GitNexus 영감) | 🔜 |
 
 상세 계획과 이어받기 가이드는 [DEVELOPMENT.md](DEVELOPMENT.md) 참고.
 
