@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
-import { Tag, Cherry, AlertTriangle, Play, X as XIcon, RotateCcw, AlertOctagon } from 'lucide-react'
+import { Tag, Cherry, AlertTriangle, Play, X as XIcon, RotateCcw, AlertOctagon, GitMerge, SkipForward } from 'lucide-react'
 import { api, type CommitInfo } from '../api'
 import { buildGraph, maxLaneCount } from '../lib/graph'
 import { CommitGraph } from './CommitGraph'
@@ -62,6 +62,65 @@ interface CtxMenu {
   isMerge: boolean
 }
 
+function ProgressBanner({
+  label,
+  onContinue,
+  onSkip,
+  onAbort,
+}: {
+  label: string
+  onContinue: () => void
+  onSkip?: () => void
+  onAbort: () => void
+}) {
+  return (
+    <div style={{
+      display: 'flex',
+      alignItems: 'center',
+      gap: '8px',
+      padding: '8px 12px',
+      background: 'rgba(249, 226, 175, 0.12)',
+      borderBottom: '1px solid var(--yellow)',
+      borderLeft: '3px solid var(--yellow)',
+      fontSize: '12px',
+      color: 'var(--text-primary)',
+    }}>
+      <AlertTriangle size={14} strokeWidth={2.5} color="var(--yellow)" style={{ flexShrink: 0 }} />
+      <span style={{ flex: 1 }}>{label}</span>
+      <button
+        className="btn btn-sm"
+        onClick={onContinue}
+        style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}
+      >
+        <Play size={11} strokeWidth={2.5} /> 계속
+      </button>
+      {onSkip && (
+        <button
+          className="btn btn-sm"
+          onClick={onSkip}
+          style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}
+        >
+          <SkipForward size={11} strokeWidth={2.5} /> 건너뛰기
+        </button>
+      )}
+      <button
+        className="btn btn-sm"
+        onClick={onAbort}
+        style={{
+          display: 'inline-flex',
+          alignItems: 'center',
+          gap: 4,
+          background: 'var(--red)',
+          color: 'var(--bg-primary)',
+          borderColor: 'var(--red)',
+        }}
+      >
+        <XIcon size={11} strokeWidth={2.5} /> 중단
+      </button>
+    </div>
+  )
+}
+
 function MenuButton({
   icon,
   label,
@@ -107,6 +166,7 @@ export function CommitLog({ selectedCommit, onSelectCommit, file }: Props) {
   const [reachedEnd, setReachedEnd] = useState(false)
   const [ctxMenu, setCtxMenu] = useState<CtxMenu | null>(null)
   const [cherryInProgress, setCherryInProgress] = useState(false)
+  const [rebaseInProgress, setRebaseInProgress] = useState(false)
   const listRef = useRef<HTMLUListElement>(null)
 
   const confirm = useConfirm()
@@ -139,9 +199,15 @@ export function CommitLog({ selectedCommit, onSelectCommit, file }: Props) {
     setCherryInProgress(r.ok ? r.data : false)
   }, [])
 
+  const refreshRebaseStatus = useCallback(async () => {
+    const r = await api.rebaseInProgress()
+    setRebaseInProgress(r.ok ? r.data : false)
+  }, [])
+
   useEffect(() => {
     refreshCherryStatus()
-  }, [refreshCherryStatus])
+    refreshRebaseStatus()
+  }, [refreshCherryStatus, refreshRebaseStatus])
 
   // 컨텍스트 메뉴 외부 클릭/Esc 로 닫기
   useEffect(() => {
@@ -208,6 +274,72 @@ export function CommitLog({ selectedCommit, onSelectCommit, file }: Props) {
     }
     await reload()
     await refreshCherryStatus()
+  }
+
+  const handleRebase = async (target: CtxMenu) => {
+    setCtxMenu(null)
+    const ok = await confirm({
+      title: 'Rebase',
+      message: `현재 브랜치를 이 커밋 위로 rebase 합니다.\n히스토리가 다시 쓰여지므로 이미 push 한 브랜치라면 충돌 위험이 있습니다.\n\n대상: ${target.hashShort}`,
+      variant: 'warn',
+      confirmLabel: 'Rebase',
+    })
+    if (!ok) return
+    const result = await api.rebase(target.hash)
+    if (result.ok) {
+      toast.success('Rebase 완료')
+    } else {
+      toast.error(`Rebase 실패: ${result.error}`)
+    }
+    await reload()
+    await refreshRebaseStatus()
+  }
+
+  const handleRebaseContinue = async () => {
+    const r = await api.rebaseContinue()
+    if (r.ok) {
+      toast.success('Rebase 계속 완료')
+    } else {
+      toast.error(`계속 실패: ${r.error}`)
+    }
+    await reload()
+    await refreshRebaseStatus()
+  }
+
+  const handleRebaseSkip = async () => {
+    const ok = await confirm({
+      title: 'Rebase 건너뛰기',
+      message: '현재 충돌 중인 커밋을 건너뜁니다 (해당 커밋은 새 히스토리에 포함되지 않음).',
+      variant: 'warn',
+      confirmLabel: '건너뛰기',
+    })
+    if (!ok) return
+    const r = await api.rebaseSkip()
+    if (r.ok) {
+      toast.info('커밋 건너뜀')
+    } else {
+      toast.error(`건너뛰기 실패: ${r.error}`)
+    }
+    await reload()
+    await refreshRebaseStatus()
+  }
+
+  const handleRebaseAbort = async () => {
+    const ok = await confirm({
+      title: 'Rebase 중단',
+      message: '진행 중인 rebase를 중단하고 이전 상태로 되돌립니다.',
+      variant: 'danger',
+      confirmLabel: '중단',
+    })
+    if (!ok) return
+    const r = await api.rebaseAbort()
+    if (r.ok) {
+      toast.info('Rebase 중단됨')
+    } else {
+      toast.error(`중단 실패: ${r.error}`)
+    }
+    await reload()
+    await refreshRebaseStatus()
   }
 
   const handleReset = async (target: CtxMenu, mode: 'soft' | 'mixed' | 'hard') => {
@@ -305,41 +437,19 @@ export function CommitLog({ selectedCommit, onSelectCommit, file }: Props) {
   return (
     <>
       {cherryInProgress && (
-        <div style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: '8px',
-          padding: '8px 12px',
-          background: 'rgba(249, 226, 175, 0.12)',
-          borderBottom: '1px solid var(--yellow)',
-          borderLeft: '3px solid var(--yellow)',
-          fontSize: '12px',
-          color: 'var(--text-primary)',
-        }}>
-          <AlertTriangle size={14} strokeWidth={2.5} color="var(--yellow)" style={{ flexShrink: 0 }} />
-          <span style={{ flex: 1 }}>Cherry-pick 진행 중. 충돌이 있으면 해결한 뒤 계속하세요.</span>
-          <button
-            className="btn btn-sm"
-            onClick={handleCherryContinue}
-            style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}
-          >
-            <Play size={11} strokeWidth={2.5} /> 계속
-          </button>
-          <button
-            className="btn btn-sm"
-            onClick={handleCherryAbort}
-            style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: 4,
-              background: 'var(--red)',
-              color: 'var(--bg-primary)',
-              borderColor: 'var(--red)',
-            }}
-          >
-            <XIcon size={11} strokeWidth={2.5} /> 중단
-          </button>
-        </div>
+        <ProgressBanner
+          label="Cherry-pick 진행 중. 충돌이 있으면 해결한 뒤 계속하세요."
+          onContinue={handleCherryContinue}
+          onAbort={handleCherryAbort}
+        />
+      )}
+      {rebaseInProgress && (
+        <ProgressBanner
+          label="Rebase 진행 중. 충돌을 해결하면 계속, 이 커밋을 건너뛰려면 건너뛰기, 되돌리려면 중단을 누르세요."
+          onContinue={handleRebaseContinue}
+          onSkip={handleRebaseSkip}
+          onAbort={handleRebaseAbort}
+        />
       )}
       <ul
         ref={listRef}
@@ -463,6 +573,11 @@ export function CommitLog({ selectedCommit, onSelectCommit, file }: Props) {
             icon={<Cherry size={13} strokeWidth={2.5} color="var(--red)" />}
             label={`Cherry-pick${ctxMenu.isMerge ? ' (merge, -m 1)' : ''}`}
             onClick={() => handleCherryPick(ctxMenu)}
+          />
+          <MenuButton
+            icon={<GitMerge size={13} strokeWidth={2.5} color="var(--mauve)" />}
+            label="Rebase current onto here"
+            onClick={() => handleRebase(ctxMenu)}
           />
 
           <div style={{ height: 1, background: 'var(--border)', margin: '4px 0' }} />

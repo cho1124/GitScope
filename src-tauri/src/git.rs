@@ -443,6 +443,54 @@ pub fn cherry_pick_continue(state: State<AppState>) -> Result<(), String> {
     })
 }
 
+/// 현재 브랜치를 지정한 커밋/브랜치 위로 rebase (비-interactive).
+#[tauri::command]
+pub fn rebase(target: String, state: State<AppState>) -> Result<(), String> {
+    with_repo(&state, |path| {
+        run_git(path, &["rebase", &target])?;
+        Ok(())
+    })
+}
+
+#[tauri::command]
+pub fn rebase_abort(state: State<AppState>) -> Result<(), String> {
+    with_repo(&state, |path| {
+        run_git(path, &["rebase", "--abort"])?;
+        Ok(())
+    })
+}
+
+#[tauri::command]
+pub fn rebase_continue(state: State<AppState>) -> Result<(), String> {
+    with_repo(&state, |path| {
+        run_git(path, &["rebase", "--continue"])?;
+        Ok(())
+    })
+}
+
+#[tauri::command]
+pub fn rebase_skip(state: State<AppState>) -> Result<(), String> {
+    with_repo(&state, |path| {
+        run_git(path, &["rebase", "--skip"])?;
+        Ok(())
+    })
+}
+
+/// rebase 진행 중 여부 (.git/rebase-merge 또는 .git/rebase-apply 디렉토리 존재 검사)
+#[tauri::command]
+pub fn rebase_in_progress(state: State<AppState>) -> Result<bool, String> {
+    with_repo(&state, |path| {
+        let git_dir = run_git(path, &["rev-parse", "--git-dir"])?;
+        let git_dir_trimmed = git_dir.trim();
+        let base = if std::path::Path::new(git_dir_trimmed).is_absolute() {
+            std::path::PathBuf::from(git_dir_trimmed)
+        } else {
+            path.join(git_dir_trimmed)
+        };
+        Ok(base.join("rebase-merge").is_dir() || base.join("rebase-apply").is_dir())
+    })
+}
+
 /// 현재 브랜치 HEAD를 지정한 커밋으로 reset.
 /// - mode: "soft" (HEAD만 이동) | "mixed" (HEAD + 스테이징 초기화) | "hard" (HEAD + 스테이징 + 워킹트리 초기화, 위험)
 #[tauri::command]

@@ -178,6 +178,13 @@ export const api = {
   reset: (hash: string, mode: 'soft' | 'mixed' | 'hard') =>
     call<void>('reset', { hash, mode }),
 
+  // ── Rebase (Phase 8-C) ───────────────────────────────
+  rebase: (target: string) => call<void>('rebase', { target }),
+  rebaseAbort: () => call<void>('rebase_abort'),
+  rebaseContinue: () => call<void>('rebase_continue'),
+  rebaseSkip: () => call<void>('rebase_skip'),
+  rebaseInProgress: () => call<boolean>('rebase_in_progress'),
+
   push: () => call<void>('push'),
   pull: () => call<void>('pull'),
 
