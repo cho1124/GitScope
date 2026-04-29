@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { api, type StatusInfo } from '../api'
 import { DiffView } from './DiffView'
 import { useToast } from './Toast'
+import { StashAccordion } from './StashAccordion'
 
 interface Props {
   onCommitDone: () => void
@@ -75,18 +76,6 @@ export function CommitPanel({ onCommitDone }: Props) {
     }
   }
 
-  const handlePush = async () => {
-    const result = await api.push()
-    if (result.ok) toast.success('Push 완료')
-    else toast.error(result.error)
-  }
-
-  const handlePull = async () => {
-    const result = await api.pull()
-    if (result.ok) { onCommitDone(); await loadStatus(); toast.success('Pull 완료') }
-    else toast.error(result.error)
-  }
-
   if (loading) return <div className="loading"><span className="spinner" /> 상태 로딩 중...</div>
 
   const staged = status?.staged || []
@@ -96,12 +85,8 @@ export function CommitPanel({ onCommitDone }: Props) {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', height: '100%', minHeight: 0 }}>
-      {/* 액션 바 */}
-      <div style={{ display: 'flex', gap: '8px' }}>
-        <button className="btn btn-sm" onClick={handlePull}>Pull</button>
-        <button className="btn btn-sm" onClick={handlePush}>Push</button>
-        <button className="btn btn-sm" onClick={loadStatus}>새로고침</button>
-      </div>
+      {/* Stash 아코디언 (기본 접힘) */}
+      <StashAccordion onChanged={loadStatus} />
 
       {/* 좌: 파일 리스트 / 우: diff 미리보기 */}
       <div style={{ display: 'flex', gap: '12px', flex: 1, minHeight: 0 }}>

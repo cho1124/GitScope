@@ -1,4 +1,5 @@
 import { useState, useCallback, useEffect } from 'react'
+import { DownloadCloud, ArrowDownToLine, ArrowUpFromLine, RefreshCw, Settings as SettingsIcon } from 'lucide-react'
 import { api, type RepoInfo } from './api'
 import { FileTree } from './components/FileTree'
 import { CommitLog } from './components/CommitLog'
@@ -9,22 +10,30 @@ import { CommitPanel } from './components/CommitPanel'
 import { FileHistory } from './components/FileHistory'
 import { BranchSelector } from './components/BranchSelector'
 import { WelcomeScreen } from './components/WelcomeScreen'
-import { StashPanel } from './components/StashPanel'
-import { ThemeSelector } from './components/ThemeSelector'
+import { RepoSelector } from './components/RepoSelector'
+import { SettingsModal } from './components/SettingsModal'
 import { useToast } from './components/Toast'
 
-type Tab = 'commits' | 'changes' | 'stash' | 'forensics'
+type Tab = 'changes' | 'commits' | 'forensics'
+
+function repoNameFromPath(path: string): string {
+  const cleaned = path.replace(/[\\/]+$/, '')
+  const idx = Math.max(cleaned.lastIndexOf('/'), cleaned.lastIndexOf('\\'))
+  return idx >= 0 ? cleaned.slice(idx + 1) : cleaned
+}
 
 export default function App() {
   const toast = useToast()
   const [repo, setRepo] = useState<RepoInfo | null>(null)
-  const [activeTab, setActiveTab] = useState<Tab>('commits')
+  const [activeTab, setActiveTab] = useState<Tab>('changes')
   const [selectedCommit, setSelectedCommit] = useState<string | null>(null)
   const [selectedFile, setSelectedFile] = useState<string | null>(null)
   const [diff, setDiff] = useState<string>('')
   const [showFileHistory, setShowFileHistory] = useState(false)
   const [refreshKey, setRefreshKey] = useState(0)
   const [loading, setLoading] = useState(false)
+  const [settingsOpen, setSettingsOpen] = useState(false)
+  const [remoteBusy, setRemoteBusy] = useState<null | 'fetch' | 'pull' | 'push'>(null)
 
   const handleOpenRepo = useCallback(async (path: string) => {
     const trimmed = path.trim()
@@ -37,6 +46,8 @@ export default function App() {
       setSelectedCommit(null)
       setDiff('')
       setSelectedFile(null)
+      setShowFileHistory(false)
+      setActiveTab('changes')
       setRefreshKey(k => k + 1)
     } else {
       toast.error(result.error)
@@ -65,15 +76,50 @@ export default function App() {
     setRefreshKey(k => k + 1)
   }, [])
 
-  // 키보드 단축키 (Ctrl+1~4 탭 전환, F5 새로고침)
+  const handleFetch = useCallback(async () => {
+    setRemoteBusy('fetch')
+    const r = await api.fetch()
+    setRemoteBusy(null)
+    if (r.ok) {
+      toast.success('Fetch 완료')
+      setRefreshKey(k => k + 1)
+    } else {
+      toast.error(`Fetch 실패: ${r.error}`)
+    }
+  }, [toast])
+
+  const handlePull = useCallback(async () => {
+    setRemoteBusy('pull')
+    const r = await api.pull()
+    setRemoteBusy(null)
+    if (r.ok) {
+      toast.success('Pull 완료')
+      setRefreshKey(k => k + 1)
+    } else {
+      toast.error(`Pull 실패: ${r.error}`)
+    }
+  }, [toast])
+
+  const handlePush = useCallback(async () => {
+    setRemoteBusy('push')
+    const r = await api.push()
+    setRemoteBusy(null)
+    if (r.ok) {
+      toast.success('Push 완료')
+      setRefreshKey(k => k + 1)
+    } else {
+      toast.error(`Push 실패: ${r.error}`)
+    }
+  }, [toast])
+
+  // 키보드 단축키 (Ctrl+1~3 탭 전환, F5 새로고침)
   useEffect(() => {
     if (!repo) return
     const onKey = (e: KeyboardEvent) => {
       if (e.ctrlKey || e.metaKey) {
-        if (e.key === '1') { e.preventDefault(); setActiveTab('commits') }
-        else if (e.key === '2') { e.preventDefault(); setActiveTab('changes') }
-        else if (e.key === '3') { e.preventDefault(); setActiveTab('stash') }
-        else if (e.key === '4') { e.preventDefault(); setActiveTab('forensics') }
+        if (e.key === '1') { e.preventDefault(); setActiveTab('changes') }
+        else if (e.key === '2') { e.preventDefault(); setActiveTab('commits') }
+        else if (e.key === '3') { e.preventDefault(); setActiveTab('forensics') }
       }
       if (e.key === 'F5') { e.preventDefault(); handleRefresh() }
     }
@@ -91,22 +137,64 @@ export default function App() {
 
   return (
     <div className="app-container">
-      <header className="app-header">
-        <h1>GitScope</h1>
-        <span className="repo-path">{repo.path}</span>
-        <div style={{ flex: 1 }} />
+      <header className="app-header" style={{ gap: 8 }}>
+        <RepoSelector
+          currentPath={repo.path}
+          currentName={repoNameFromPath(repo.path)}
+          onPickRepo={handleOpenRepo}
+        />
         <BranchSelector
           currentBranch={repo.currentBranch}
           onBranchChanged={handleBranchChanged}
           refreshKey={refreshKey}
         />
-        <ThemeSelector />
-        <button className="btn btn-sm" onClick={() => setRepo(null)} aria-label="다른 레포 열기">
-          다른 레포
-        </button>
-        <button className="btn btn-sm" onClick={handleRefresh} title="F5" aria-label="새로고침 (F5)">
-          새로고침
-        </button>
+
+        <div style={{
+          display: 'flex',
+          gap: 2,
+          padding: '0 4px',
+          borderLeft: '1px solid var(--border)',
+          marginLeft: 4,
+        }}>
+          <IconButton
+            icon={<DownloadCloud size={13} />}
+            label="Fetch"
+            shortcut="git fetch --all --prune"
+            onClick={handleFetch}
+            busy={remoteBusy === 'fetch'}
+            disabled={remoteBusy !== null}
+          />
+          <IconButton
+            icon={<ArrowDownToLine size={13} />}
+            label="Pull"
+            shortcut="git pull"
+            onClick={handlePull}
+            busy={remoteBusy === 'pull'}
+            disabled={remoteBusy !== null}
+          />
+          <IconButton
+            icon={<ArrowUpFromLine size={13} />}
+            label="Push"
+            shortcut="git push"
+            onClick={handlePush}
+            busy={remoteBusy === 'push'}
+            disabled={remoteBusy !== null}
+          />
+          <IconButton
+            icon={<RefreshCw size={13} />}
+            label="Refresh"
+            shortcut="F5"
+            onClick={handleRefresh}
+          />
+        </div>
+
+        <div style={{ flex: 1 }} />
+
+        <IconButton
+          icon={<SettingsIcon size={13} />}
+          label="설정"
+          onClick={() => setSettingsOpen(true)}
+        />
       </header>
 
       <div className="app-body">
@@ -153,43 +241,38 @@ export default function App() {
           <div className="content-tabs" role="tablist">
             <button
               role="tab"
-              aria-selected={activeTab === 'commits'}
-              className={`content-tab ${activeTab === 'commits' ? 'active' : ''}`}
-              onClick={() => setActiveTab('commits')}
-              title="Ctrl+1"
-            >
-              커밋 로그
-            </button>
-            <button
-              role="tab"
               aria-selected={activeTab === 'changes'}
               className={`content-tab ${activeTab === 'changes' ? 'active' : ''}`}
               onClick={() => setActiveTab('changes')}
-              title="Ctrl+2"
+              title="Ctrl+1"
             >
               변경사항
             </button>
             <button
               role="tab"
-              aria-selected={activeTab === 'stash'}
-              className={`content-tab ${activeTab === 'stash' ? 'active' : ''}`}
-              onClick={() => setActiveTab('stash')}
-              title="Ctrl+3"
+              aria-selected={activeTab === 'commits'}
+              className={`content-tab ${activeTab === 'commits' ? 'active' : ''}`}
+              onClick={() => setActiveTab('commits')}
+              title="Ctrl+2"
             >
-              Stash
+              커밋 로그
             </button>
             <button
               role="tab"
               aria-selected={activeTab === 'forensics'}
               className={`content-tab ${activeTab === 'forensics' ? 'active' : ''}`}
               onClick={() => setActiveTab('forensics')}
-              title="Ctrl+4"
+              title="Ctrl+3"
             >
               Code Forensics
             </button>
           </div>
 
           <div className="content-area">
+            {activeTab === 'changes' && (
+              <CommitPanel key={`cp-${refreshKey}`} onCommitDone={handleRefresh} />
+            )}
+
             {activeTab === 'commits' && (
               <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
                 <div style={{ flex: 1, overflow: 'auto' }}>
@@ -208,14 +291,6 @@ export default function App() {
               </div>
             )}
 
-            {activeTab === 'changes' && (
-              <CommitPanel key={`cp-${refreshKey}`} onCommitDone={handleRefresh} />
-            )}
-
-            {activeTab === 'stash' && (
-              <StashPanel key={`st-${refreshKey}`} onStashChanged={handleRefresh} />
-            )}
-
             {activeTab === 'forensics' && (
               <ForensicsDashboard key={`fd-${refreshKey}`} />
             )}
@@ -224,6 +299,39 @@ export default function App() {
       </div>
 
       <StatusBar branch={repo.currentBranch} refreshKey={refreshKey} />
+
+      {settingsOpen && <SettingsModal onClose={() => setSettingsOpen(false)} />}
     </div>
+  )
+}
+
+interface IconButtonProps {
+  icon: React.ReactNode
+  label: string
+  shortcut?: string
+  onClick: () => void
+  busy?: boolean
+  disabled?: boolean
+}
+
+function IconButton({ icon, label, shortcut, onClick, busy, disabled }: IconButtonProps) {
+  return (
+    <button
+      className="btn btn-sm"
+      onClick={onClick}
+      disabled={disabled || busy}
+      title={shortcut ? `${label} · ${shortcut}` : label}
+      aria-label={label}
+      style={{
+        padding: '4px 6px',
+        minWidth: 0,
+        display: 'inline-flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        opacity: busy ? 0.6 : 1,
+      }}
+    >
+      {busy ? <span className="spinner" style={{ width: 11, height: 11, borderWidth: 1 }} /> : icon}
+    </button>
   )
 }
