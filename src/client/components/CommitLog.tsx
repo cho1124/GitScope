@@ -5,6 +5,7 @@ import { buildGraph, maxLaneCount } from '../lib/graph'
 import { CommitGraph } from './CommitGraph'
 import { useConfirm } from './ConfirmModal'
 import { useToast } from './Toast'
+import { InteractiveRebaseModal } from './InteractiveRebaseModal'
 
 const GRAPH_LINE_HEIGHT = 36
 const GRAPH_LANE_WIDTH = 14
@@ -167,6 +168,7 @@ export function CommitLog({ selectedCommit, onSelectCommit, file }: Props) {
   const [ctxMenu, setCtxMenu] = useState<CtxMenu | null>(null)
   const [cherryInProgress, setCherryInProgress] = useState(false)
   const [rebaseInProgress, setRebaseInProgress] = useState(false)
+  const [irebaseTarget, setIrebaseTarget] = useState<{ from: string; fromShort: string } | null>(null)
   const listRef = useRef<HTMLUListElement>(null)
 
   const confirm = useConfirm()
@@ -579,6 +581,14 @@ export function CommitLog({ selectedCommit, onSelectCommit, file }: Props) {
             label="Rebase current onto here"
             onClick={() => handleRebase(ctxMenu)}
           />
+          <MenuButton
+            icon={<GitMerge size={13} strokeWidth={2.5} color="var(--mauve)" />}
+            label="Interactive rebase from here"
+            onClick={() => {
+              setIrebaseTarget({ from: ctxMenu.hash, fromShort: ctxMenu.hashShort })
+              setCtxMenu(null)
+            }}
+          />
 
           <div style={{ height: 1, background: 'var(--border)', margin: '4px 0' }} />
 
@@ -599,6 +609,20 @@ export function CommitLog({ selectedCommit, onSelectCommit, file }: Props) {
             danger
           />
         </div>
+      )}
+
+      {/* Interactive rebase 모달 */}
+      {irebaseTarget && (
+        <InteractiveRebaseModal
+          from={irebaseTarget.from}
+          fromShort={irebaseTarget.fromShort}
+          onClose={() => setIrebaseTarget(null)}
+          onApplied={async () => {
+            setIrebaseTarget(null)
+            await reload()
+            await refreshRebaseStatus()
+          }}
+        />
       )}
     </>
   )

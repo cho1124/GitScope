@@ -443,6 +443,88 @@ pub fn cherry_pick_continue(state: State<AppState>) -> Result<(), String> {
     })
 }
 
+/// `from..HEAD` 범위의 커밋 목록을 oldest-first 순서로 반환.
+/// interactive rebase 모달에서 사용.
+#[tauri::command]
+pub fn list_commits_in_range(from: String, state: State<AppState>) -> Result<Vec<CommitInfo>, String> {
+    with_repo(&state, |path| {
+        let range = format!("{}..HEAD", from);
+        let raw = run_git(
+            path,
+            &[
+                "log",
+                &range,
+                "--reverse",
+                "--pretty=format:%H\x1f%h\x1f%s\x1f%an\x1f%ae\x1f%aI\x1f%D\x1f%P",
+            ],
+        )?;
+        Ok(parse_log(&raw))
+    })
+}
+
+#[derive(serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RebaseOp {
+    pub hash: String,
+    /// "pick" | "drop"
+    pub action: String,
+}
+
+/// Interactive rebase MVP: reorder + drop.
+/// 안전장치: 시작 시 HEAD를 저장 → 실패 시 cherry-pick abort + reset --hard 로 원상 복구.
+/// 충돌 시 부분 상태 노출 없이 깔끔히 롤백.
+#[tauri::command]
+pub fn interactive_rebase(
+    from: String,
+    operations: Vec<RebaseOp>,
+    state: State<AppState>,
+) -> Result<(), String> {
+    with_repo(&state, |path| {
+        // 1. 원본 HEAD 저장 (롤백용)
+        let original_head = run_git(path, &["rev-parse", "HEAD"])?
+            .trim()
+            .to_string();
+
+        // 2. clean working tree 검증
+        let dirty = run_git(path, &["status", "--porcelain"])?;
+        if !dirty.trim().is_empty() {
+            return Err(
+                "워킹트리에 변경사항이 있습니다. 커밋 또는 stash 후 다시 시도하세요.".to_string(),
+            );
+        }
+
+        // 3. from으로 reset --hard
+        run_git(path, &["reset", "--hard", &from])
+            .map_err(|e| format!("base reset 실패: {}", e))?;
+
+        // 4. 각 op 실행 (pick → cherry-pick / drop → skip)
+        for op in &operations {
+            match op.action.as_str() {
+                "pick" => {
+                    if let Err(e) = run_git(path, &["cherry-pick", &op.hash]) {
+                        // 충돌 또는 실패 → 안전 롤백
+                        let _ = run_git(path, &["cherry-pick", "--abort"]);
+                        let _ = run_git(path, &["reset", "--hard", &original_head]);
+                        return Err(format!(
+                            "{} cherry-pick 실패. 원상 복구됨.\n\n{}",
+                            &op.hash[..7.min(op.hash.len())],
+                            e
+                        ));
+                    }
+                }
+                "drop" => {
+                    // skip — 커밋이 새 히스토리에 포함되지 않음
+                }
+                other => {
+                    let _ = run_git(path, &["reset", "--hard", &original_head]);
+                    return Err(format!("알 수 없는 action: {}", other));
+                }
+            }
+        }
+        Ok(())
+    })
+}
+
 /// 현재 브랜치를 지정한 커밋/브랜치 위로 rebase (비-interactive).
 #[tauri::command]
 pub fn rebase(target: String, state: State<AppState>) -> Result<(), String> {

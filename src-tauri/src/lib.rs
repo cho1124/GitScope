@@ -52,6 +52,8 @@ pub fn run() {
             git::rebase_continue,
             git::rebase_skip,
             git::rebase_in_progress,
+            git::list_commits_in_range,
+            git::interactive_rebase,
             git::push,
             git::pull,
             git::get_file_history,
