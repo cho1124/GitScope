@@ -11,6 +11,15 @@ if (savedTheme === 'mocha' || savedTheme === 'latte' || savedTheme === 'frappe' 
   document.documentElement.setAttribute('data-theme', savedTheme)
 }
 
+// WebView2 기본 컨텍스트 메뉴 차단 (Tauri dev 모드에서 React preventDefault 만으로는 안 됨).
+// 입력 요소(텍스트 복사/붙여넣기)에서는 허용.
+document.addEventListener('contextmenu', (e) => {
+  const target = e.target as HTMLElement | null
+  if (!target) return
+  if (target.matches?.('input, textarea, [contenteditable="true"], [contenteditable=""]')) return
+  e.preventDefault()
+}, { capture: true })
+
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
     <ToastProvider>
