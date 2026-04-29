@@ -203,6 +203,7 @@ export const api = {
   resolveConflict: (file: string, strategy: 'ours' | 'theirs') =>
     call<void>('resolve_conflict', { file, strategy }),
 
+  fetch: () => call<void>('fetch'),
   push: () => call<void>('push'),
   pull: () => call<void>('pull'),
 

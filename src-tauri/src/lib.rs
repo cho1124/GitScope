@@ -56,6 +56,7 @@ pub fn run() {
             git::interactive_rebase,
             git::list_conflicted_files,
             git::resolve_conflict,
+            git::fetch,
             git::push,
             git::pull,
             git::get_file_history,

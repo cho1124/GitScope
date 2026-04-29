@@ -759,6 +759,14 @@ pub fn cherry_pick_in_progress(state: State<AppState>) -> Result<bool, String> {
 }
 
 #[tauri::command]
+pub fn fetch(state: State<AppState>) -> Result<(), String> {
+    with_repo(&state, |path| {
+        run_git(path, &["fetch", "--all", "--prune"])?;
+        Ok(())
+    })
+}
+
+#[tauri::command]
 pub fn push(state: State<AppState>) -> Result<(), String> {
     with_repo(&state, |path| {
         run_git(path, &["push"])?;
