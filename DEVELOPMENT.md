@@ -4,10 +4,10 @@
 
 ## 현재 상태 (2026-04-29 기준)
 
-**Phase 0~6 + Phase 7 + Phase 9-A/B/C + Phase 9-D 종료 + Phase 8-A 완료.** 다음 릴리즈 후보: **v0.3.0** (Phase 8 마무리 후).
+**Phase 0~7 + Phase 9-A/B/C/D + Phase 8-A~F + 8-G-1 완료.** 다음 릴리즈 후보: **v0.3.0** (8-G-2 또는 UX 폴리시 후).
 
 ### 한 줄 요약
-Express + Vite 웹앱 → Tauri 2.10 + Rust 로컬 앱으로 재작성 후, 브랜치 UI / 최근 레포 / Stash / Forensics 개별 로딩 / Diff virtualization / Lucide 아이콘 / **Forensics 진행률 스트리밍** / **Catppuccin 4 flavor 테마 전환** / **심볼 단위 히스토리 (Tree-sitter + `git log -L`) · TS/TSX/JS/Rust/Python/C# 지원** / **Cherry-pick (Phase 8-A)** 까지 완성.
+Express + Vite 웹앱 → Tauri 2.10 + Rust 로컬 앱으로 재작성 후, 브랜치 UI / 최근 레포 / Stash / Forensics 개별 로딩 / Diff virtualization / Lucide 아이콘 / **Forensics 진행률 스트리밍** / **Catppuccin 4 flavor 테마 전환** / **심볼 단위 히스토리 (Tree-sitter + `git log -L`) · TS/TSX/JS/Rust/Python/C# 지원** / **고급 Git 액션** (cherry-pick + reset 3종 + rebase + interactive rebase reorder/drop/reword/squash/fixup + 충돌 ours/theirs 빠른 해결) / 좌측 사이드바 심볼 전용 재정의 / WebView2 컨텍스트 메뉴 차단 까지 완성.
 
 ### 릴리즈
 - **v0.1.0** (2026-04-21 저녁) — 첫 배포
