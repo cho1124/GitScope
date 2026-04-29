@@ -443,6 +443,69 @@ pub fn cherry_pick_continue(state: State<AppState>) -> Result<(), String> {
     })
 }
 
+// ───── Conflict resolution (Phase 8-G-1) ───────
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ConflictedFile {
+    path: String,
+    /// "both modified" | "both added" | "both deleted" | "added by us" | "added by them" | "deleted by us" | "deleted by them"
+    kind: String,
+}
+
+/// 현재 진행 중인 머지/cherry-pick/rebase의 충돌 파일 목록.
+#[tauri::command]
+pub fn list_conflicted_files(state: State<AppState>) -> Result<Vec<ConflictedFile>, String> {
+    with_repo(&state, |path| {
+        let raw = run_git(path, &["status", "--porcelain=v1"])?;
+        let mut conflicts = Vec::new();
+        for line in raw.lines() {
+            if line.len() < 3 {
+                continue;
+            }
+            let bytes = line.as_bytes();
+            let x = bytes[0] as char;
+            let y = bytes[1] as char;
+            let file = line[3..].to_string();
+            let kind = match (x, y) {
+                ('U', 'U') => "both modified",
+                ('A', 'A') => "both added",
+                ('D', 'D') => "both deleted",
+                ('A', 'U') => "added by us",
+                ('U', 'A') => "added by them",
+                ('D', 'U') => "deleted by us",
+                ('U', 'D') => "deleted by them",
+                _ => continue,
+            };
+            conflicts.push(ConflictedFile {
+                path: file,
+                kind: kind.to_string(),
+            });
+        }
+        Ok(conflicts)
+    })
+}
+
+/// 충돌 파일을 "ours" 또는 "theirs" 버전으로 일괄 해결 후 staging.
+/// strategy: "ours" | "theirs"
+#[tauri::command]
+pub fn resolve_conflict(
+    file: String,
+    strategy: String,
+    state: State<AppState>,
+) -> Result<(), String> {
+    with_repo(&state, |path| {
+        let strat = match strategy.as_str() {
+            "ours" => "--ours",
+            "theirs" => "--theirs",
+            other => return Err(format!("알 수 없는 strategy: {}", other)),
+        };
+        run_git(path, &["checkout", strat, "--", &file])?;
+        run_git(path, &["add", "--", &file])?;
+        Ok(())
+    })
+}
+
 /// `from..HEAD` 범위의 커밋 목록을 oldest-first 순서로 반환.
 /// interactive rebase 모달에서 사용.
 #[tauri::command]

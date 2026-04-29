@@ -54,6 +54,8 @@ pub fn run() {
             git::rebase_in_progress,
             git::list_commits_in_range,
             git::interactive_rebase,
+            git::list_conflicted_files,
+            git::resolve_conflict,
             git::push,
             git::pull,
             git::get_file_history,

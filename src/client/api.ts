@@ -185,7 +185,7 @@ export const api = {
   rebaseSkip: () => call<void>('rebase_skip'),
   rebaseInProgress: () => call<boolean>('rebase_in_progress'),
 
-  // ── Interactive rebase (Phase 8-D / 8-E) ─────────────
+  // ── Interactive rebase (Phase 8-D / 8-E / 8-F) ───────
   listCommitsInRange: (from: string) =>
     call<CommitInfo[]>('list_commits_in_range', { from }),
   interactiveRebase: (
@@ -196,6 +196,12 @@ export const api = {
       message?: string
     }>,
   ) => call<void>('interactive_rebase', { from, operations }),
+
+  // ── Conflict resolution (Phase 8-G-1) ────────────────
+  listConflictedFiles: () =>
+    call<Array<{ path: string; kind: string }>>('list_conflicted_files'),
+  resolveConflict: (file: string, strategy: 'ours' | 'theirs') =>
+    call<void>('resolve_conflict', { file, strategy }),
 
   push: () => call<void>('push'),
   pull: () => call<void>('pull'),

@@ -63,6 +63,79 @@ interface CtxMenu {
   isMerge: boolean
 }
 
+function ConflictsPanel({
+  conflicts,
+  onResolve,
+}: {
+  conflicts: Array<{ path: string; kind: string }>
+  onResolve: (file: string, strategy: 'ours' | 'theirs') => void
+}) {
+  return (
+    <div style={{
+      padding: '8px 12px',
+      background: 'rgba(243, 139, 168, 0.06)',
+      borderBottom: '1px solid var(--red)',
+      borderLeft: '3px solid var(--red)',
+      fontSize: 12,
+      color: 'var(--text-primary)',
+    }}>
+      <div style={{
+        fontSize: 11,
+        color: 'var(--red)',
+        marginBottom: 6,
+        display: 'flex',
+        alignItems: 'center',
+        gap: 6,
+      }}>
+        <AlertTriangle size={12} strokeWidth={2.5} />
+        충돌 {conflicts.length}개 — Take ours/theirs 로 빠른 해결, 또는 외부 에디터에서 수동 해결 후 Stage
+      </div>
+      <ul style={{ listStyle: 'none', margin: 0, padding: 0 }}>
+        {conflicts.map(c => (
+          <li
+            key={c.path}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 8,
+              padding: '4px 0',
+              fontSize: 11,
+            }}
+          >
+            <span style={{
+              fontFamily: 'var(--font-mono)',
+              color: 'var(--text-primary)',
+              flex: 1,
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              whiteSpace: 'nowrap',
+            }}>
+              {c.path}
+            </span>
+            <span style={{ color: 'var(--text-muted)', fontSize: 10 }}>{c.kind}</span>
+            <button
+              className="btn btn-sm"
+              onClick={() => onResolve(c.path, 'ours')}
+              title="현재 브랜치 버전으로 해결"
+              style={{ fontSize: 10, padding: '2px 6px' }}
+            >
+              Take ours
+            </button>
+            <button
+              className="btn btn-sm"
+              onClick={() => onResolve(c.path, 'theirs')}
+              title="들어오는 버전으로 해결"
+              style={{ fontSize: 10, padding: '2px 6px' }}
+            >
+              Take theirs
+            </button>
+          </li>
+        ))}
+      </ul>
+    </div>
+  )
+}
+
 function ProgressBanner({
   label,
   onContinue,
@@ -168,6 +241,7 @@ export function CommitLog({ selectedCommit, onSelectCommit, file }: Props) {
   const [ctxMenu, setCtxMenu] = useState<CtxMenu | null>(null)
   const [cherryInProgress, setCherryInProgress] = useState(false)
   const [rebaseInProgress, setRebaseInProgress] = useState(false)
+  const [conflicts, setConflicts] = useState<Array<{ path: string; kind: string }>>([])
   const [irebaseTarget, setIrebaseTarget] = useState<{ from: string; fromShort: string } | null>(null)
   const listRef = useRef<HTMLUListElement>(null)
 
@@ -206,10 +280,26 @@ export function CommitLog({ selectedCommit, onSelectCommit, file }: Props) {
     setRebaseInProgress(r.ok ? r.data : false)
   }, [])
 
+  const refreshConflicts = useCallback(async () => {
+    const r = await api.listConflictedFiles()
+    setConflicts(r.ok ? r.data : [])
+  }, [])
+
   useEffect(() => {
     refreshCherryStatus()
     refreshRebaseStatus()
-  }, [refreshCherryStatus, refreshRebaseStatus])
+    refreshConflicts()
+  }, [refreshCherryStatus, refreshRebaseStatus, refreshConflicts])
+
+  const handleResolveConflict = async (file: string, strategy: 'ours' | 'theirs') => {
+    const r = await api.resolveConflict(file, strategy)
+    if (r.ok) {
+      toast.success(`${file}: ${strategy === 'ours' ? '내 버전' : '상대 버전'} 으로 해결`)
+    } else {
+      toast.error(`해결 실패: ${r.error}`)
+    }
+    await refreshConflicts()
+  }
 
   // 컨텍스트 메뉴 외부 클릭/Esc 로 닫기
   useEffect(() => {
@@ -247,6 +337,7 @@ export function CommitLog({ selectedCommit, onSelectCommit, file }: Props) {
     }
     await reload()
     await refreshCherryStatus()
+    await refreshConflicts()
   }
 
   const handleCherryAbort = async () => {
@@ -265,6 +356,7 @@ export function CommitLog({ selectedCommit, onSelectCommit, file }: Props) {
     }
     await reload()
     await refreshCherryStatus()
+    await refreshConflicts()
   }
 
   const handleCherryContinue = async () => {
@@ -276,6 +368,7 @@ export function CommitLog({ selectedCommit, onSelectCommit, file }: Props) {
     }
     await reload()
     await refreshCherryStatus()
+    await refreshConflicts()
   }
 
   const handleRebase = async (target: CtxMenu) => {
@@ -295,6 +388,7 @@ export function CommitLog({ selectedCommit, onSelectCommit, file }: Props) {
     }
     await reload()
     await refreshRebaseStatus()
+    await refreshConflicts()
   }
 
   const handleRebaseContinue = async () => {
@@ -306,6 +400,7 @@ export function CommitLog({ selectedCommit, onSelectCommit, file }: Props) {
     }
     await reload()
     await refreshRebaseStatus()
+    await refreshConflicts()
   }
 
   const handleRebaseSkip = async () => {
@@ -324,6 +419,7 @@ export function CommitLog({ selectedCommit, onSelectCommit, file }: Props) {
     }
     await reload()
     await refreshRebaseStatus()
+    await refreshConflicts()
   }
 
   const handleRebaseAbort = async () => {
@@ -342,6 +438,7 @@ export function CommitLog({ selectedCommit, onSelectCommit, file }: Props) {
     }
     await reload()
     await refreshRebaseStatus()
+    await refreshConflicts()
   }
 
   const handleReset = async (target: CtxMenu, mode: 'soft' | 'mixed' | 'hard') => {
@@ -451,6 +548,12 @@ export function CommitLog({ selectedCommit, onSelectCommit, file }: Props) {
           onContinue={handleRebaseContinue}
           onSkip={handleRebaseSkip}
           onAbort={handleRebaseAbort}
+        />
+      )}
+      {(cherryInProgress || rebaseInProgress) && conflicts.length > 0 && (
+        <ConflictsPanel
+          conflicts={conflicts}
+          onResolve={handleResolveConflict}
         />
       )}
       <ul
@@ -621,6 +724,7 @@ export function CommitLog({ selectedCommit, onSelectCommit, file }: Props) {
             setIrebaseTarget(null)
             await reload()
             await refreshRebaseStatus()
+            await refreshConflicts()
           }}
         />
       )}
