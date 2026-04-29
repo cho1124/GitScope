@@ -122,8 +122,9 @@ export default function App() {
             <button
               className={`sidebar-tab ${showFileHistory ? 'active' : ''}`}
               onClick={() => selectedFile && setShowFileHistory(true)}
+              title="선택한 파일의 함수/클래스 단위 변경 히스토리"
             >
-              파일 히스토리
+              심볼 히스토리
             </button>
           </div>
           <div className="sidebar-content">
