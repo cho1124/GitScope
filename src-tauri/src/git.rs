@@ -400,6 +400,64 @@ pub fn merge_branch(
     })
 }
 
+/// 단일 커밋을 현재 브랜치로 cherry-pick.
+/// - `no_commit`: true 면 적용만 하고 커밋은 보류 (--no-commit)
+/// - `mainline`: merge 커밋일 때 부모 번호 (1=첫번째 부모, 2=두번째 부모)
+#[tauri::command]
+pub fn cherry_pick(
+    hash: String,
+    no_commit: Option<bool>,
+    mainline: Option<u32>,
+    state: State<AppState>,
+) -> Result<(), String> {
+    with_repo(&state, |path| {
+        let mainline_str;
+        let mut args: Vec<&str> = vec!["cherry-pick"];
+        if no_commit.unwrap_or(false) {
+            args.push("--no-commit");
+        }
+        if let Some(m) = mainline {
+            args.push("-m");
+            mainline_str = m.to_string();
+            args.push(&mainline_str);
+        }
+        args.push(&hash);
+        run_git(path, &args)?;
+        Ok(())
+    })
+}
+
+#[tauri::command]
+pub fn cherry_pick_abort(state: State<AppState>) -> Result<(), String> {
+    with_repo(&state, |path| {
+        run_git(path, &["cherry-pick", "--abort"])?;
+        Ok(())
+    })
+}
+
+#[tauri::command]
+pub fn cherry_pick_continue(state: State<AppState>) -> Result<(), String> {
+    with_repo(&state, |path| {
+        run_git(path, &["cherry-pick", "--continue"])?;
+        Ok(())
+    })
+}
+
+/// cherry-pick 진행 중 여부 (.git/CHERRY_PICK_HEAD 존재 검사)
+#[tauri::command]
+pub fn cherry_pick_in_progress(state: State<AppState>) -> Result<bool, String> {
+    with_repo(&state, |path| {
+        let git_dir = run_git(path, &["rev-parse", "--git-dir"])?;
+        let git_dir_trimmed = git_dir.trim();
+        let cherry_head = if std::path::Path::new(git_dir_trimmed).is_absolute() {
+            std::path::PathBuf::from(git_dir_trimmed).join("CHERRY_PICK_HEAD")
+        } else {
+            path.join(git_dir_trimmed).join("CHERRY_PICK_HEAD")
+        };
+        Ok(cherry_head.exists())
+    })
+}
+
 #[tauri::command]
 pub fn push(state: State<AppState>) -> Result<(), String> {
     with_repo(&state, |path| {

@@ -1,8 +1,10 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
-import { Tag } from 'lucide-react'
+import { Tag, Cherry, AlertTriangle, Play, X as XIcon } from 'lucide-react'
 import { api, type CommitInfo } from '../api'
 import { buildGraph, maxLaneCount } from '../lib/graph'
 import { CommitGraph } from './CommitGraph'
+import { useConfirm } from './ConfirmModal'
+import { useToast } from './Toast'
 
 const GRAPH_LINE_HEIGHT = 36
 const GRAPH_LANE_WIDTH = 14
@@ -52,12 +54,25 @@ const pillStyle: React.CSSProperties = {
 
 const PAGE_SIZE = 100
 
+interface CtxMenu {
+  hash: string
+  hashShort: string
+  x: number
+  y: number
+  isMerge: boolean
+}
+
 export function CommitLog({ selectedCommit, onSelectCommit, file }: Props) {
   const [commits, setCommits] = useState<CommitInfo[]>([])
   const [loading, setLoading] = useState(true)
   const [loadingMore, setLoadingMore] = useState(false)
   const [reachedEnd, setReachedEnd] = useState(false)
+  const [ctxMenu, setCtxMenu] = useState<CtxMenu | null>(null)
+  const [cherryInProgress, setCherryInProgress] = useState(false)
   const listRef = useRef<HTMLUListElement>(null)
+
+  const confirm = useConfirm()
+  const toast = useToast()
 
   // 초기/파일 변경 시 로드
   useEffect(() => {
@@ -71,6 +86,91 @@ export function CommitLog({ selectedCommit, onSelectCommit, file }: Props) {
       setLoading(false)
     })
   }, [file])
+
+  const reload = useCallback(async () => {
+    const target = Math.max(commits.length, PAGE_SIZE)
+    const result = await api.getLog({ maxCount: target, file: file ?? undefined })
+    if (result.ok) {
+      setCommits(result.data)
+      setReachedEnd(result.data.length < target)
+    }
+  }, [commits.length, file])
+
+  const refreshCherryStatus = useCallback(async () => {
+    const r = await api.cherryPickInProgress()
+    setCherryInProgress(r.ok ? r.data : false)
+  }, [])
+
+  useEffect(() => {
+    refreshCherryStatus()
+  }, [refreshCherryStatus])
+
+  // 컨텍스트 메뉴 외부 클릭/Esc 로 닫기
+  useEffect(() => {
+    if (!ctxMenu) return
+    const onMouseDown = () => setCtxMenu(null)
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setCtxMenu(null)
+    }
+    window.addEventListener('mousedown', onMouseDown)
+    window.addEventListener('keydown', onKey)
+    return () => {
+      window.removeEventListener('mousedown', onMouseDown)
+      window.removeEventListener('keydown', onKey)
+    }
+  }, [ctxMenu])
+
+  const handleCherryPick = async (target: CtxMenu) => {
+    setCtxMenu(null)
+    const mainline = target.isMerge ? 1 : undefined
+    const message = target.isMerge
+      ? `머지 커밋입니다. 첫 번째 부모(-m 1)를 기준으로 cherry-pick 합니다.\n\n${target.hashShort}`
+      : `이 커밋을 현재 브랜치에 cherry-pick 합니다.\n\n${target.hashShort}`
+    const ok = await confirm({
+      title: 'Cherry-pick',
+      message,
+      variant: 'warn',
+      confirmLabel: 'Cherry-pick',
+    })
+    if (!ok) return
+    const result = await api.cherryPick(target.hash, { mainline })
+    if (result.ok) {
+      toast.success('Cherry-pick 완료')
+    } else {
+      toast.error(`Cherry-pick 실패: ${result.error}`)
+    }
+    await reload()
+    await refreshCherryStatus()
+  }
+
+  const handleCherryAbort = async () => {
+    const ok = await confirm({
+      title: 'Cherry-pick 중단',
+      message: '진행 중인 cherry-pick을 중단하고 이전 상태로 되돌립니다.',
+      variant: 'danger',
+      confirmLabel: '중단',
+    })
+    if (!ok) return
+    const r = await api.cherryPickAbort()
+    if (r.ok) {
+      toast.info('Cherry-pick 중단됨')
+    } else {
+      toast.error(`중단 실패: ${r.error}`)
+    }
+    await reload()
+    await refreshCherryStatus()
+  }
+
+  const handleCherryContinue = async () => {
+    const r = await api.cherryPickContinue()
+    if (r.ok) {
+      toast.success('Cherry-pick 계속 완료')
+    } else {
+      toast.error(`계속 실패: ${r.error}`)
+    }
+    await reload()
+    await refreshCherryStatus()
+  }
 
   const loadMore = useCallback(async () => {
     if (loadingMore || reachedEnd) return
@@ -142,6 +242,43 @@ export function CommitLog({ selectedCommit, onSelectCommit, file }: Props) {
 
   return (
     <>
+      {cherryInProgress && (
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: '8px',
+          padding: '8px 12px',
+          background: 'rgba(249, 226, 175, 0.12)',
+          borderBottom: '1px solid var(--yellow)',
+          borderLeft: '3px solid var(--yellow)',
+          fontSize: '12px',
+          color: 'var(--text-primary)',
+        }}>
+          <AlertTriangle size={14} strokeWidth={2.5} color="var(--yellow)" style={{ flexShrink: 0 }} />
+          <span style={{ flex: 1 }}>Cherry-pick 진행 중. 충돌이 있으면 해결한 뒤 계속하세요.</span>
+          <button
+            className="btn btn-sm"
+            onClick={handleCherryContinue}
+            style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}
+          >
+            <Play size={11} strokeWidth={2.5} /> 계속
+          </button>
+          <button
+            className="btn btn-sm"
+            onClick={handleCherryAbort}
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 4,
+              background: 'var(--red)',
+              color: 'var(--bg-primary)',
+              borderColor: 'var(--red)',
+            }}
+          >
+            <XIcon size={11} strokeWidth={2.5} /> 중단
+          </button>
+        </div>
+      )}
       <ul
         ref={listRef}
         className="commit-list"
@@ -159,6 +296,16 @@ export function CommitLog({ selectedCommit, onSelectCommit, file }: Props) {
               data-hash={commit.hash}
               className={`commit-item ${isSelected ? 'selected' : ''}`}
               onClick={() => onSelectCommit(commit.hash)}
+              onContextMenu={(e) => {
+                e.preventDefault()
+                setCtxMenu({
+                  hash: commit.hash,
+                  hashShort: commit.hashShort,
+                  x: e.clientX,
+                  y: e.clientY,
+                  isMerge: commit.parents.length >= 2,
+                })
+              }}
               role="option"
               aria-selected={isSelected}
             >
@@ -230,6 +377,50 @@ export function CommitLog({ selectedCommit, onSelectCommit, file }: Props) {
           </>
         )}
       </div>
+
+      {/* 우클릭 컨텍스트 메뉴 */}
+      {ctxMenu && (
+        <div
+          role="menu"
+          onMouseDown={(e) => e.stopPropagation()}
+          style={{
+            position: 'fixed',
+            left: ctxMenu.x,
+            top: ctxMenu.y,
+            background: 'var(--bg-secondary)',
+            border: '1px solid var(--border)',
+            borderRadius: 'var(--radius)',
+            boxShadow: '0 4px 12px rgba(0,0,0,0.4)',
+            padding: '4px',
+            minWidth: '180px',
+            zIndex: 9000,
+            fontSize: '12px',
+          }}
+        >
+          <button
+            role="menuitem"
+            onClick={() => handleCherryPick(ctxMenu)}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              width: '100%',
+              padding: '6px 10px',
+              background: 'none',
+              border: 'none',
+              color: 'var(--text-primary)',
+              textAlign: 'left',
+              cursor: 'pointer',
+              borderRadius: 'calc(var(--radius) - 2px)',
+            }}
+            onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--bg-hover)')}
+            onMouseLeave={(e) => (e.currentTarget.style.background = 'none')}
+          >
+            <Cherry size={13} strokeWidth={2.5} color="var(--red)" />
+            <span>Cherry-pick {ctxMenu.isMerge ? '(merge, -m 1)' : ''}</span>
+          </button>
+        </div>
+      )}
     </>
   )
 }

@@ -163,6 +163,17 @@ export const api = {
   mergeBranch: (name: string, noFf?: boolean) =>
     call<string>('merge_branch', { name, noFf: noFf ?? false }),
 
+  // ── Cherry-pick (Phase 8-A) ──────────────────────────
+  cherryPick: (hash: string, opts?: { noCommit?: boolean; mainline?: number }) =>
+    call<void>('cherry_pick', {
+      hash,
+      noCommit: opts?.noCommit ?? false,
+      mainline: opts?.mainline ?? null,
+    }),
+  cherryPickAbort: () => call<void>('cherry_pick_abort'),
+  cherryPickContinue: () => call<void>('cherry_pick_continue'),
+  cherryPickInProgress: () => call<boolean>('cherry_pick_in_progress'),
+
   push: () => call<void>('push'),
   pull: () => call<void>('pull'),
 
