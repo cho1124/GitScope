@@ -10,8 +10,11 @@ interface Props {
   onApplied: () => void
 }
 
+type Action = 'pick' | 'reword' | 'drop'
+
 interface Item extends CommitInfo {
-  keep: boolean
+  action: Action
+  rewordMessage: string  // reword 액션에서만 사용. 초기값은 원 커밋 메시지.
 }
 
 export function InteractiveRebaseModal({ from, fromShort, onClose, onApplied }: Props) {
@@ -30,7 +33,7 @@ export function InteractiveRebaseModal({ from, fromShort, onClose, onApplied }: 
     setLoading(true)
     api.listCommitsInRange(from).then(r => {
       if (r.ok) {
-        setItems(r.data.map(c => ({ ...c, keep: true })))
+        setItems(r.data.map(c => ({ ...c, action: 'pick' as Action, rewordMessage: c.message })))
       } else {
         toast.error(`커밋 로드 실패: ${r.error}`)
         onClose()
@@ -61,9 +64,15 @@ export function InteractiveRebaseModal({ from, fromShort, onClose, onApplied }: 
     setItems(next)
   }
 
-  const toggleKeep = (idx: number) => {
+  const setAction = (idx: number, action: Action) => {
     const next = [...items]
-    next[idx] = { ...next[idx], keep: !next[idx].keep }
+    next[idx] = { ...next[idx], action }
+    setItems(next)
+  }
+
+  const setRewordMessage = (idx: number, msg: string) => {
+    const next = [...items]
+    next[idx] = { ...next[idx], rewordMessage: msg }
     setItems(next)
   }
 
@@ -71,7 +80,8 @@ export function InteractiveRebaseModal({ from, fromShort, onClose, onApplied }: 
     setApplying(true)
     const operations = items.map(i => ({
       hash: i.hash,
-      action: i.keep ? ('pick' as const) : ('drop' as const),
+      action: i.action,
+      message: i.action === 'reword' ? i.rewordMessage : undefined,
     }))
     const r = await api.interactiveRebase(from, operations)
     setApplying(false)
@@ -83,8 +93,12 @@ export function InteractiveRebaseModal({ from, fromShort, onClose, onApplied }: 
     }
   }
 
-  const keepCount = items.filter(i => i.keep).length
-  const dropCount = items.length - keepCount
+  const keepCount = items.filter(i => i.action !== 'drop').length
+  const rewordCount = items.filter(i => i.action === 'reword').length
+  const dropCount = items.filter(i => i.action === 'drop').length
+  const hasInvalidReword = items.some(
+    i => i.action === 'reword' && i.rewordMessage.trim() === '',
+  )
 
   return (
     <div
@@ -143,6 +157,7 @@ export function InteractiveRebaseModal({ from, fromShort, onClose, onApplied }: 
         <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 12 }}>
           <code style={{ color: 'var(--mauve)' }}>{fromShort}</code> 위로 재적용 ·
           {' '}<span style={{ color: 'var(--green)' }}>{keepCount} 유지</span>
+          {rewordCount > 0 && <>{' / '}<span style={{ color: 'var(--mauve)' }}>{rewordCount} reword</span></>}
           {' / '}<span style={{ color: 'var(--red)' }}>{dropCount} 드롭</span>
           {' · 충돌 시 자동 롤백'}
         </div>
@@ -165,59 +180,99 @@ export function InteractiveRebaseModal({ from, fromShort, onClose, onApplied }: 
             </div>
           ) : (
             <ul style={{ listStyle: 'none', margin: 0, padding: 0 }}>
-              {items.map((item, idx) => (
-                <li
-                  key={item.hash}
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 8,
-                    padding: '6px 8px',
-                    borderBottom: idx < items.length - 1 ? '1px solid var(--border)' : 'none',
-                    fontSize: 12,
-                    background: item.keep ? 'transparent' : 'rgba(243, 139, 168, 0.06)',
-                    opacity: item.keep ? 1 : 0.55,
-                  }}
-                >
-                  <button
-                    aria-label="위로"
-                    disabled={idx === 0 || applying}
-                    onClick={() => moveUp(idx)}
-                    style={{ ...iconBtnStyle, opacity: idx === 0 ? 0.3 : 1 }}
+              {items.map((item, idx) => {
+                const isDrop = item.action === 'drop'
+                const isReword = item.action === 'reword'
+                const rewordEmpty = isReword && item.rewordMessage.trim() === ''
+                return (
+                  <li
+                    key={item.hash}
+                    style={{
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: 6,
+                      padding: '6px 8px',
+                      borderBottom: idx < items.length - 1 ? '1px solid var(--border)' : 'none',
+                      fontSize: 12,
+                      background: isDrop ? 'rgba(243, 139, 168, 0.06)' : isReword ? 'rgba(203, 166, 247, 0.06)' : 'transparent',
+                      opacity: isDrop ? 0.55 : 1,
+                    }}
                   >
-                    <ChevronUp size={12} strokeWidth={2.5} />
-                  </button>
-                  <button
-                    aria-label="아래로"
-                    disabled={idx === items.length - 1 || applying}
-                    onClick={() => moveDown(idx)}
-                    style={{ ...iconBtnStyle, opacity: idx === items.length - 1 ? 0.3 : 1 }}
-                  >
-                    <ChevronDown size={12} strokeWidth={2.5} />
-                  </button>
-                  <input
-                    type="checkbox"
-                    checked={item.keep}
-                    onChange={() => toggleKeep(idx)}
-                    disabled={applying}
-                    aria-label={item.keep ? '드롭으로 변경' : 'pick으로 변경'}
-                    style={{ cursor: applying ? 'not-allowed' : 'pointer' }}
-                  />
-                  <code style={{ color: 'var(--accent)', fontFamily: 'var(--font-mono)', fontSize: 11 }}>
-                    {item.hashShort}
-                  </code>
-                  <span style={{
-                    flex: 1,
-                    overflow: 'hidden',
-                    textOverflow: 'ellipsis',
-                    whiteSpace: 'nowrap',
-                    color: 'var(--text-primary)',
-                  }}>
-                    {item.message}
-                  </span>
-                  <span style={{ color: 'var(--text-muted)', fontSize: 10 }}>{item.author}</span>
-                </li>
-              ))}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <button
+                        aria-label="위로"
+                        disabled={idx === 0 || applying}
+                        onClick={() => moveUp(idx)}
+                        style={{ ...iconBtnStyle, opacity: idx === 0 ? 0.3 : 1 }}
+                      >
+                        <ChevronUp size={12} strokeWidth={2.5} />
+                      </button>
+                      <button
+                        aria-label="아래로"
+                        disabled={idx === items.length - 1 || applying}
+                        onClick={() => moveDown(idx)}
+                        style={{ ...iconBtnStyle, opacity: idx === items.length - 1 ? 0.3 : 1 }}
+                      >
+                        <ChevronDown size={12} strokeWidth={2.5} />
+                      </button>
+                      <select
+                        value={item.action}
+                        onChange={(e) => setAction(idx, e.target.value as Action)}
+                        disabled={applying}
+                        aria-label="action"
+                        style={{
+                          background: 'var(--bg-surface)',
+                          border: '1px solid var(--border)',
+                          borderRadius: 3,
+                          color: isDrop ? 'var(--red)' : isReword ? 'var(--mauve)' : 'var(--text-primary)',
+                          fontSize: 11,
+                          fontFamily: 'var(--font-mono)',
+                          padding: '2px 4px',
+                          cursor: applying ? 'not-allowed' : 'pointer',
+                        }}
+                      >
+                        <option value="pick">pick</option>
+                        <option value="reword">reword</option>
+                        <option value="drop">drop</option>
+                      </select>
+                      <code style={{ color: 'var(--accent)', fontFamily: 'var(--font-mono)', fontSize: 11 }}>
+                        {item.hashShort}
+                      </code>
+                      <span style={{
+                        flex: 1,
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        whiteSpace: 'nowrap',
+                        color: 'var(--text-primary)',
+                        textDecoration: isDrop ? 'line-through' : 'none',
+                      }}>
+                        {item.message}
+                      </span>
+                      <span style={{ color: 'var(--text-muted)', fontSize: 10 }}>{item.author}</span>
+                    </div>
+                    {isReword && (
+                      <textarea
+                        value={item.rewordMessage}
+                        onChange={(e) => setRewordMessage(idx, e.target.value)}
+                        disabled={applying}
+                        rows={2}
+                        placeholder="새 커밋 메시지"
+                        style={{
+                          marginLeft: 56,  // dropdown 아래 정렬용
+                          background: 'var(--bg-surface)',
+                          border: `1px solid ${rewordEmpty ? 'var(--red)' : 'var(--border)'}`,
+                          borderRadius: 3,
+                          color: 'var(--text-primary)',
+                          fontSize: 11,
+                          fontFamily: 'var(--font-mono)',
+                          padding: '4px 6px',
+                          resize: 'vertical',
+                        }}
+                      />
+                    )}
+                  </li>
+                )
+              })}
             </ul>
           )}
         </div>
@@ -229,7 +284,8 @@ export function InteractiveRebaseModal({ from, fromShort, onClose, onApplied }: 
           <button
             className="btn btn-sm"
             onClick={apply}
-            disabled={applying || loading || items.length === 0 || keepCount === 0}
+            disabled={applying || loading || items.length === 0 || keepCount === 0 || hasInvalidReword}
+            title={hasInvalidReword ? 'reword 메시지를 입력하세요' : undefined}
             style={{ background: 'var(--mauve)', color: 'var(--bg-primary)', borderColor: 'var(--mauve)' }}
           >
             {applying ? (

@@ -185,11 +185,13 @@ export const api = {
   rebaseSkip: () => call<void>('rebase_skip'),
   rebaseInProgress: () => call<boolean>('rebase_in_progress'),
 
-  // ── Interactive rebase (Phase 8-D) ───────────────────
+  // ── Interactive rebase (Phase 8-D / 8-E) ─────────────
   listCommitsInRange: (from: string) =>
     call<CommitInfo[]>('list_commits_in_range', { from }),
-  interactiveRebase: (from: string, operations: Array<{ hash: string; action: 'pick' | 'drop' }>) =>
-    call<void>('interactive_rebase', { from, operations }),
+  interactiveRebase: (
+    from: string,
+    operations: Array<{ hash: string; action: 'pick' | 'reword' | 'drop'; message?: string }>,
+  ) => call<void>('interactive_rebase', { from, operations }),
 
   push: () => call<void>('push'),
   pull: () => call<void>('pull'),

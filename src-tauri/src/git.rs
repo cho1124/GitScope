@@ -466,11 +466,14 @@ pub fn list_commits_in_range(from: String, state: State<AppState>) -> Result<Vec
 #[serde(rename_all = "camelCase")]
 pub struct RebaseOp {
     pub hash: String,
-    /// "pick" | "drop"
+    /// "pick" | "reword" | "drop"
     pub action: String,
+    /// reword 시 새 커밋 메시지. 다른 action은 무시.
+    #[serde(default)]
+    pub message: Option<String>,
 }
 
-/// Interactive rebase MVP: reorder + drop.
+/// Interactive rebase: reorder + drop + reword.
 /// 안전장치: 시작 시 HEAD를 저장 → 실패 시 cherry-pick abort + reset --hard 로 원상 복구.
 /// 충돌 시 부분 상태 노출 없이 깔끔히 롤백.
 #[tauri::command]
@@ -493,23 +496,49 @@ pub fn interactive_rebase(
             );
         }
 
-        // 3. from으로 reset --hard
+        // 3. reword 사전 검증 (실행 전에 메시지 누락 잡아내기 — 부분 적용 후 롤백 비용 절약)
+        for op in &operations {
+            if op.action == "reword" {
+                let msg = op.message.as_deref().map(str::trim).unwrap_or("");
+                if msg.is_empty() {
+                    return Err(format!(
+                        "{} reword 작업에 메시지가 비어있습니다.",
+                        &op.hash[..7.min(op.hash.len())]
+                    ));
+                }
+            }
+        }
+
+        let rollback = |path: &PathBuf, ctx: &str, e: &str, hash: &str| -> String {
+            let _ = run_git(path, &["cherry-pick", "--abort"]);
+            let _ = run_git(path, &["reset", "--hard", &original_head]);
+            format!(
+                "{} {} 실패. 원상 복구됨.\n\n{}",
+                &hash[..7.min(hash.len())],
+                ctx,
+                e
+            )
+        };
+
+        // 4. from으로 reset --hard
         run_git(path, &["reset", "--hard", &from])
             .map_err(|e| format!("base reset 실패: {}", e))?;
 
-        // 4. 각 op 실행 (pick → cherry-pick / drop → skip)
+        // 5. 각 op 실행
         for op in &operations {
             match op.action.as_str() {
                 "pick" => {
                     if let Err(e) = run_git(path, &["cherry-pick", &op.hash]) {
-                        // 충돌 또는 실패 → 안전 롤백
-                        let _ = run_git(path, &["cherry-pick", "--abort"]);
-                        let _ = run_git(path, &["reset", "--hard", &original_head]);
-                        return Err(format!(
-                            "{} cherry-pick 실패. 원상 복구됨.\n\n{}",
-                            &op.hash[..7.min(op.hash.len())],
-                            e
-                        ));
+                        return Err(rollback(path, "cherry-pick", &e, &op.hash));
+                    }
+                }
+                "reword" => {
+                    if let Err(e) = run_git(path, &["cherry-pick", &op.hash]) {
+                        return Err(rollback(path, "cherry-pick (reword)", &e, &op.hash));
+                    }
+                    let msg = op.message.as_deref().unwrap_or("");
+                    if let Err(e) = run_git(path, &["commit", "--amend", "-m", msg]) {
+                        return Err(rollback(path, "메시지 amend", &e, &op.hash));
                     }
                 }
                 "drop" => {
