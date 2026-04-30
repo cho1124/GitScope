@@ -3,13 +3,11 @@ import ReactDOM from 'react-dom/client'
 import App from './App'
 import { ToastProvider } from './components/Toast'
 import { ConfirmProvider } from './components/ConfirmModal'
+import { applyTheme, getSavedTheme } from './components/ThemeSelector'
 import './global.css'
 
-// 초기 테마 적용 — React 렌더 전에 실행해서 flash 방지
-const savedTheme = localStorage.getItem('gitscope.theme')
-if (savedTheme === 'mocha' || savedTheme === 'latte' || savedTheme === 'frappe' || savedTheme === 'macchiato') {
-  document.documentElement.setAttribute('data-theme', savedTheme)
-}
+// 초기 테마 적용 — React 렌더 전에 실행해서 flash 방지 (built-in + custom 모두 처리)
+applyTheme(getSavedTheme())
 
 // WebView2 기본 컨텍스트 메뉴 차단 (Tauri dev 모드에서 React preventDefault 만으로는 안 됨).
 // 입력 요소(텍스트 복사/붙여넣기)에서는 허용.
