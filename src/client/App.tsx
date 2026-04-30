@@ -96,9 +96,12 @@ export default function App() {
   if (!repo) {
     return (
       <div className="app-container">
-        <div className="welcome-titlebar" data-tauri-drag-region onMouseDown={onDragHandle}>
+        {/* data-tauri-drag-region 부착 X — Tauri 자동 핸들러가 closest()로
+            부모를 찾기 때문에 자식 버튼에 "false" 줘도 부모 drag region 매치되어 충돌.
+            onMouseDown(onDragHandle)만 사용하고 핸들러 내부에서 인터랙티브 자식 차단. */}
+        <div className="welcome-titlebar" onMouseDown={onDragHandle}>
           <Logo />
-          <div style={{ flex: 1 }} data-tauri-drag-region onMouseDown={onDragHandle} />
+          <div style={{ flex: 1 }} />
           <WindowControls />
         </div>
         <WelcomeScreen onOpen={handleOpenRepo} opening={loading} />
@@ -132,7 +135,7 @@ export default function App() {
           />
         </div>
 
-        <div className="header-drag-spacer" data-tauri-drag-region style={{ flex: 1 }} />
+        <div className="header-drag-spacer" style={{ flex: 1 }} />
 
         <IconButton
           icon={<SettingsIcon size={13} />}
@@ -250,11 +253,10 @@ export default function App() {
   )
 }
 
-/** 좌측 워드마크. 드래그 핸들 역할도 겸함. */
+/** 좌측 워드마크. 부모 헤더의 onMouseDown 이 드래그 처리. */
 function Logo() {
   return (
     <div
-      data-tauri-drag-region
       style={{
         display: 'inline-flex',
         alignItems: 'center',
@@ -266,7 +268,6 @@ function Logo() {
     >
       <span
         aria-hidden
-        data-tauri-drag-region
         style={{
           width: 20,
           height: 20,
@@ -276,7 +277,6 @@ function Logo() {
         }}
       />
       <span
-        data-tauri-drag-region
         style={{
           fontSize: 12,
           fontWeight: 600,
