@@ -14,6 +14,7 @@ import { RepoSelector } from './components/RepoSelector'
 import { RemoteSyncButton } from './components/RemoteSyncButton'
 import { SettingsModal } from './components/SettingsModal'
 import { WindowControls } from './components/WindowControls'
+import { onDragHandle } from './lib/dragRegion'
 import { useToast } from './components/Toast'
 
 type Tab = 'changes' | 'commits' | 'forensics'
@@ -95,9 +96,9 @@ export default function App() {
   if (!repo) {
     return (
       <div className="app-container">
-        <div className="welcome-titlebar" data-tauri-drag-region>
+        <div className="welcome-titlebar" data-tauri-drag-region onMouseDown={onDragHandle}>
           <Logo />
-          <div style={{ flex: 1 }} data-tauri-drag-region />
+          <div style={{ flex: 1 }} data-tauri-drag-region onMouseDown={onDragHandle} />
           <WindowControls />
         </div>
         <WelcomeScreen onOpen={handleOpenRepo} opening={loading} />
@@ -107,7 +108,7 @@ export default function App() {
 
   return (
     <div className="app-container">
-      <header className="app-header" style={{ gap: 8 }}>
+      <header className="app-header" style={{ gap: 8 }} onMouseDown={onDragHandle}>
         <Logo />
         <RepoSelector
           currentPath={repo.path}
