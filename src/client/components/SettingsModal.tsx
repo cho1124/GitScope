@@ -1,14 +1,20 @@
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import {
   Settings as SettingsIcon, X, Check, Sparkles, Eye, EyeOff,
-  Trash2, Save, Copy, AlertTriangle,
+  Trash2, Copy, Pencil, AlertTriangle, Cpu,
 } from 'lucide-react'
 import {
   type Theme, type CustomTheme,
   builtinThemes, getSavedTheme, applyTheme,
   getCustomThemes, saveCustomTheme, deleteCustomTheme,
 } from './ThemeSelector'
-import { generateTheme, contrastRatio, type ThemePalette } from '../lib/themeGenerator'
+import {
+  listProviders, getProvider, getSelectedProviderId, setSelectedProviderId,
+  type ThemePalette, type ThemeAiProvider, type ProviderAvailability,
+  ANTHROPIC_API_KEY_STORAGE, ANTHROPIC_MODEL_STORAGE, ANTHROPIC_DEFAULT_MODEL,
+  ANTHROPIC_MODEL_OPTIONS,
+} from '../lib/ai'
+import { ManualPaletteEditor } from './ManualPaletteEditor'
 import { useToast } from './Toast'
 import { useConfirm } from './ConfirmModal'
 
@@ -16,15 +22,24 @@ interface Props {
   onClose: () => void
 }
 
-const API_KEY_STORAGE = 'gitscope.anthropicApiKey'
-const MODEL_STORAGE = 'gitscope.themeGenModel'
-const DEFAULT_MODEL = 'claude-opus-4-7'
+type EditorMode = 'closed' | 'manual' | 'ai-result' | 'edit-existing'
 
-const MODEL_OPTIONS = [
-  { id: 'claude-opus-4-7', label: 'Opus 4.7 (가장 높은 품질, $5/$25 per 1M)' },
-  { id: 'claude-sonnet-4-6', label: 'Sonnet 4.6 (밸런스, $3/$15)' },
-  { id: 'claude-haiku-4-5', label: 'Haiku 4.5 (가장 빠르고 저렴, $1/$5)' },
-]
+interface EditorState {
+  mode: EditorMode
+  initial: ThemePalette | null
+  /** 'edit-existing' 일 때 갱신할 custom theme id */
+  editingId?: string
+}
+
+const DEFAULT_EMPTY: ThemePalette = {
+  name: 'Custom Theme',
+  tokens: {
+    'bg-primary': '#1e1e2e', 'bg-secondary': '#181825', 'bg-surface': '#313244', 'bg-hover': '#45475a',
+    'text-primary': '#cdd6f4', 'text-secondary': '#bac2de', 'text-muted': '#7f849c',
+    'border': '#45475a', 'accent': '#89b4fa', 'green': '#a6e3a1', 'yellow': '#f9e2af',
+    'peach': '#fab387', 'red': '#f38ba8', 'mauve': '#cba6f7',
+  },
+}
 
 export function SettingsModal({ onClose }: Props) {
   const toast = useToast()
@@ -33,16 +48,22 @@ export function SettingsModal({ onClose }: Props) {
   const [entered, setEntered] = useState(false)
   const [customThemes, setCustomThemes] = useState<CustomTheme[]>([])
 
+  // provider 상태
+  const providers = listProviders()
+  const [providerId, setProviderId] = useState<string>(() => getSelectedProviderId())
+  const [providerStatus, setProviderStatus] = useState<Record<string, ProviderAvailability>>({})
+
   // 생성기 상태
   const [genOpen, setGenOpen] = useState(false)
-  const [apiKey, setApiKey] = useState<string>(() => localStorage.getItem(API_KEY_STORAGE) ?? '')
+  const [apiKey, setApiKey] = useState<string>(() => localStorage.getItem(ANTHROPIC_API_KEY_STORAGE) ?? '')
   const [showKey, setShowKey] = useState(false)
-  const [model, setModel] = useState<string>(() => localStorage.getItem(MODEL_STORAGE) ?? DEFAULT_MODEL)
+  const [model, setModel] = useState<string>(() => localStorage.getItem(ANTHROPIC_MODEL_STORAGE) ?? ANTHROPIC_DEFAULT_MODEL)
   const [prompt, setPrompt] = useState('')
   const [busy, setBusy] = useState(false)
-  // 생성 후 확정 전 미리보기 상태 — 저장 또는 취소되기 전까지 임시 적용
-  const [preview, setPreview] = useState<ThemePalette | null>(null)
-  // 미리보기 시작 직전의 테마(취소 시 복원)
+
+  // 편집기 상태
+  const [editor, setEditor] = useState<EditorState>({ mode: 'closed', initial: null })
+  // 편집/AI 미리보기 시작 직전의 테마 (취소 시 복원)
   const [previewStash, setPreviewStash] = useState<Theme | null>(null)
 
   useEffect(() => { setCustomThemes(getCustomThemes()) }, [])
@@ -52,25 +73,36 @@ export function SettingsModal({ onClose }: Props) {
     return () => clearTimeout(t)
   }, [])
 
+  // provider 가용 상태 갱신
+  const refreshAvailability = useCallback(async () => {
+    const next: Record<string, ProviderAvailability> = {}
+    for (const p of providers) {
+      next[p.id] = await p.isAvailable()
+    }
+    setProviderStatus(next)
+  }, [providers])
+
+  useEffect(() => {
+    refreshAvailability()
+  }, [refreshAvailability, apiKey])
+
+  const handleClose = useCallback(() => {
+    if (previewStash) applyTheme(previewStash)
+    onClose()
+  }, [previewStash, onClose])
+
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') handleClose()
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [previewStash])
-
-  const handleClose = () => {
-    // 미리보기 중이면 원래 테마 복원하고 닫기
-    if (previewStash) applyTheme(previewStash)
-    onClose()
-  }
+  }, [handleClose])
 
   const handleSelectTheme = (next: Theme) => {
-    // 미리보기 중에 다른 테마 선택하면 미리보기 취소
     if (previewStash) {
-      setPreview(null)
+      // 미리보기 / 편집 중에 다른 테마 클릭 → 미리보기 취소
+      setEditor({ mode: 'closed', initial: null })
       setPreviewStash(null)
     }
     setTheme(next)
@@ -87,43 +119,56 @@ export function SettingsModal({ onClose }: Props) {
     if (!ok) return
     deleteCustomTheme(id)
     setCustomThemes(getCustomThemes())
-    if (theme === id) {
-      // 현재 적용된 테마가 삭제되면 mocha로 복귀
-      handleSelectTheme('mocha')
-    }
+    if (theme === id) handleSelectTheme('mocha')
     toast.info(`"${name}" 삭제됨`)
   }
 
+  const handleEditExisting = (c: CustomTheme) => {
+    if (!previewStash) setPreviewStash(theme)
+    setEditor({
+      mode: 'edit-existing',
+      initial: { name: c.name, tokens: c.tokens },
+      editingId: c.id,
+    })
+  }
+
+  const handleManualNew = () => {
+    if (!previewStash) setPreviewStash(theme)
+    applyInline(DEFAULT_EMPTY)
+    setEditor({ mode: 'manual', initial: DEFAULT_EMPTY })
+  }
+
   const handleGenerate = async () => {
-    const trimmedKey = apiKey.trim()
     const trimmedPrompt = prompt.trim()
-    if (!trimmedKey) {
-      toast.error('Anthropic API 키를 입력하세요')
-      return
-    }
     if (!trimmedPrompt) {
       toast.error('테마 설명을 입력하세요')
       return
     }
+    const provider = getProvider(providerId)
+    if (!provider) {
+      toast.error('Provider 가 선택되지 않았습니다')
+      return
+    }
+    const status = await provider.isAvailable()
+    if (!status.ok) {
+      toast.error(`${provider.label} 사용 불가: ${status.reason}`)
+      return
+    }
 
-    // API 키 / 모델 자동 저장
-    localStorage.setItem(API_KEY_STORAGE, trimmedKey)
-    localStorage.setItem(MODEL_STORAGE, model)
+    // Anthropic 의 경우 키/모델 자동 저장
+    if (providerId === 'anthropic') {
+      localStorage.setItem(ANTHROPIC_API_KEY_STORAGE, apiKey.trim())
+      localStorage.setItem(ANTHROPIC_MODEL_STORAGE, model)
+    }
+    setSelectedProviderId(providerId)
 
     setBusy(true)
     try {
-      const palette = await generateTheme({ apiKey: trimmedKey, prompt: trimmedPrompt, model })
-
-      // WCAG AA contrast 경고 (차단은 안 함)
-      const cr = contrastRatio(palette.tokens['text-primary'], palette.tokens['bg-primary'])
-      if (cr < 4.5) {
-        toast.warn(`경고: text/bg 대비비 ${cr.toFixed(2)}:1 (WCAG AA 4.5 미달)`)
-      }
-
-      // 미리보기 시작 — 현재 테마 stash 후 임시 적용
+      const palette = await provider.generate({ prompt: trimmedPrompt, model })
+      // 미리보기 stash + 편집기로 결과 넘기기
       if (!previewStash) setPreviewStash(theme)
       applyInline(palette)
-      setPreview(palette)
+      setEditor({ mode: 'ai-result', initial: palette })
     } catch (e) {
       toast.error(`테마 생성 실패: ${e instanceof Error ? e.message : String(e)}`)
     } finally {
@@ -131,47 +176,55 @@ export function SettingsModal({ onClose }: Props) {
     }
   }
 
-  const handleSavePreview = () => {
-    if (!preview) return
-    const id = `custom-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
-    const item: CustomTheme = {
-      id,
-      name: preview.name,
-      tokens: preview.tokens,
-      createdAt: new Date().toISOString(),
+  const handleEditorSave = (palette: ThemePalette) => {
+    if (editor.mode === 'edit-existing' && editor.editingId) {
+      // 기존 custom 갱신 — id 유지, name/tokens 교체
+      const existing = customThemes.find(t => t.id === editor.editingId)
+      const item: CustomTheme = {
+        id: editor.editingId,
+        name: palette.name,
+        tokens: palette.tokens,
+        createdAt: existing?.createdAt ?? new Date().toISOString(),
+      }
+      saveCustomTheme(item)
+      setCustomThemes(getCustomThemes())
+      setTheme(item.id)
+      applyTheme(item.id)
+      toast.success(`"${item.name}" 갱신됨`)
+    } else {
+      const id = `custom-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
+      const item: CustomTheme = {
+        id, name: palette.name, tokens: palette.tokens,
+        createdAt: new Date().toISOString(),
+      }
+      saveCustomTheme(item)
+      setCustomThemes(getCustomThemes())
+      setTheme(id)
+      applyTheme(id)
+      toast.success(`"${item.name}" 저장됨`)
     }
-    saveCustomTheme(item)
-    setCustomThemes(getCustomThemes())
-    setTheme(id)
-    applyTheme(id)
-    setPreview(null)
+    setEditor({ mode: 'closed', initial: null })
     setPreviewStash(null)
     setPrompt('')
-    toast.success(`"${item.name}" 저장됨`)
   }
 
-  const handleDiscardPreview = () => {
+  const handleEditorClose = () => {
     if (previewStash) applyTheme(previewStash)
-    setPreview(null)
+    setEditor({ mode: 'closed', initial: null })
     setPreviewStash(null)
     setTheme(getSavedTheme())
   }
 
   const handleCopyJson = (target: ThemePalette | CustomTheme) => {
-    const payload = 'tokens' in target ? target : null
-    if (!payload) return
     const json = JSON.stringify({ name: target.name, tokens: target.tokens }, null, 2)
     navigator.clipboard.writeText(json)
       .then(() => toast.info('JSON 클립보드 복사됨'))
       .catch(() => toast.error('클립보드 복사 실패'))
   }
 
-  const previewWarning = useMemo(() => {
-    if (!preview) return null
-    const cr = contrastRatio(preview.tokens['text-primary'], preview.tokens['bg-primary'])
-    if (cr < 4.5) return `WCAG AA 미달 (${cr.toFixed(2)}:1)`
-    return null
-  }, [preview])
+  const selectedProvider = getProvider(providerId)
+  const selectedStatus = providerStatus[providerId]
+  const editorOpen = editor.mode !== 'closed'
 
   return (
     <div
@@ -192,7 +245,7 @@ export function SettingsModal({ onClose }: Props) {
           border: '1px solid var(--border)',
           borderRadius: 'var(--radius)',
           padding: '16px 20px',
-          width: 560,
+          width: 600,
           maxWidth: 'calc(100vw - 40px)',
           maxHeight: 'calc(100vh - 80px)',
           overflow: 'auto',
@@ -218,11 +271,11 @@ export function SettingsModal({ onClose }: Props) {
           </button>
         </div>
 
-        {/* 테마 섹션 — 기본 + custom 그리드 */}
+        {/* 테마 그리드 */}
         <Section title="테마">
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 8 }}>
             {builtinThemes.map(t => {
-              const selected = t.id === theme && !preview
+              const selected = t.id === theme && !editorOpen
               return (
                 <ThemeCard
                   key={t.id}
@@ -234,7 +287,7 @@ export function SettingsModal({ onClose }: Props) {
               )
             })}
             {customThemes.map(c => {
-              const selected = c.id === theme && !preview
+              const selected = c.id === theme && !editorOpen
               return (
                 <ThemeCard
                   key={c.id}
@@ -243,69 +296,160 @@ export function SettingsModal({ onClose }: Props) {
                   accent={c.tokens['accent']}
                   selected={selected}
                   onClick={() => handleSelectTheme(c.id)}
+                  onEdit={() => handleEditExisting(c)}
                   onDelete={() => handleDeleteCustom(c.id, c.name)}
                   onCopy={() => handleCopyJson(c)}
                 />
               )
             })}
           </div>
-        </Section>
-
-        {/* AI 테마 생성기 */}
-        <Section title="AI로 새 테마 만들기">
-          {!genOpen ? (
+          <div style={{ marginTop: 8, display: 'flex', gap: 6 }}>
             <button
+              type="button"
               className="btn btn-sm"
-              onClick={() => setGenOpen(true)}
+              onClick={handleManualNew}
+              disabled={editorOpen}
               style={{
-                display: 'inline-flex', alignItems: 'center', gap: 6,
-                background: 'var(--mauve)', color: 'var(--bg-primary)', borderColor: 'var(--mauve)',
-                fontSize: 12, padding: '6px 12px',
+                display: 'inline-flex', alignItems: 'center', gap: 4,
+                fontSize: 11, padding: '5px 10px',
               }}
             >
-              <Sparkles size={12} /> 생성기 열기
+              <Pencil size={11} /> 직접 만들기
             </button>
-          ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-              {/* API 키 */}
-              <div>
-                <Label>Anthropic API 키 (sk-ant-...)</Label>
-                <div style={{ display: 'flex', gap: 4 }}>
-                  <input
-                    type={showKey ? 'text' : 'password'}
-                    value={apiKey}
-                    onChange={e => setApiKey(e.target.value)}
-                    placeholder="sk-ant-api03-..."
-                    style={{ flex: 1, fontFamily: 'var(--font-mono)', fontSize: 11 }}
-                    autoComplete="off"
-                  />
-                  <button
-                    type="button"
-                    className="btn btn-sm"
-                    onClick={() => setShowKey(v => !v)}
-                    aria-label={showKey ? '숨기기' : '보이기'}
-                    title={showKey ? '숨기기' : '보이기'}
-                    style={{ padding: '4px 6px' }}
-                  >
-                    {showKey ? <EyeOff size={12} /> : <Eye size={12} />}
-                  </button>
-                </div>
-                <Hint>로컬 localStorage 저장. 직접 console.anthropic.com 에서 발급한 키 사용.</Hint>
-              </div>
+            <button
+              type="button"
+              className="btn btn-sm"
+              onClick={() => setGenOpen(v => !v)}
+              disabled={editorOpen}
+              style={{
+                display: 'inline-flex', alignItems: 'center', gap: 4,
+                background: 'var(--mauve)', color: 'var(--bg-primary)', borderColor: 'var(--mauve)',
+                fontSize: 11, padding: '5px 10px',
+              }}
+            >
+              <Sparkles size={11} /> AI 생성기 {genOpen ? '닫기' : '열기'}
+            </button>
+          </div>
+        </Section>
 
-              {/* 모델 선택 */}
+        {/* 편집기가 열려 있으면 그것만 보여주기 (포커스) */}
+        {editorOpen && editor.initial && (
+          <Section
+            title={
+              editor.mode === 'ai-result' ? 'AI 생성 결과 — 미세 조정' :
+              editor.mode === 'edit-existing' ? '기존 테마 편집' :
+              '수동 편집'
+            }
+          >
+            <ManualPaletteEditor
+              key={`editor-${editor.mode}-${editor.editingId ?? 'new'}`}
+              initial={editor.initial}
+              onSave={handleEditorSave}
+              onClose={handleEditorClose}
+              onLivePreview={applyInline}
+            />
+          </Section>
+        )}
+
+        {/* AI 생성기 — 편집기 닫혀 있고 genOpen 일 때만 */}
+        {genOpen && !editorOpen && (
+          <Section title="AI 생성기">
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              {/* Provider 선택 */}
               <div>
-                <Label>모델</Label>
+                <Label>Provider</Label>
                 <select
-                  value={model}
-                  onChange={e => setModel(e.target.value)}
+                  value={providerId}
+                  onChange={e => {
+                    setProviderId(e.target.value)
+                    setSelectedProviderId(e.target.value)
+                  }}
                   style={{ width: '100%', fontSize: 11, padding: '4px 6px' }}
                 >
-                  {MODEL_OPTIONS.map(m => (
-                    <option key={m.id} value={m.id}>{m.label}</option>
-                  ))}
+                  {providers.map(p => {
+                    const s = providerStatus[p.id]
+                    const ok = s?.ok ?? false
+                    return (
+                      <option key={p.id} value={p.id}>
+                        {p.label}{ok ? '' : ` — ${s?.reason ?? '확인 중'}`}
+                      </option>
+                    )
+                  })}
                 </select>
+                {selectedProvider && (
+                  <Hint>
+                    {selectedProvider.description}
+                    {selectedStatus && !selectedStatus.ok && (
+                      <span style={{ color: 'var(--yellow)', display: 'inline-flex', alignItems: 'center', gap: 3, marginLeft: 6 }}>
+                        <AlertTriangle size={9} /> {selectedStatus.reason}
+                      </span>
+                    )}
+                  </Hint>
+                )}
               </div>
+
+              {/* Anthropic 전용 옵션 */}
+              {providerId === 'anthropic' && (
+                <>
+                  <div>
+                    <Label>Anthropic API 키 (sk-ant-...)</Label>
+                    <div style={{ display: 'flex', gap: 4 }}>
+                      <input
+                        type={showKey ? 'text' : 'password'}
+                        value={apiKey}
+                        onChange={e => setApiKey(e.target.value)}
+                        placeholder="sk-ant-api03-..."
+                        style={{ flex: 1, fontFamily: 'var(--font-mono)', fontSize: 11 }}
+                        autoComplete="off"
+                      />
+                      <button
+                        type="button"
+                        className="btn btn-sm"
+                        onClick={() => setShowKey(v => !v)}
+                        aria-label={showKey ? '숨기기' : '보이기'}
+                        style={{ padding: '4px 6px' }}
+                      >
+                        {showKey ? <EyeOff size={12} /> : <Eye size={12} />}
+                      </button>
+                    </div>
+                    <Hint>로컬 localStorage 저장. console.anthropic.com 발급 키.</Hint>
+                  </div>
+
+                  <div>
+                    <Label>모델</Label>
+                    <select
+                      value={model}
+                      onChange={e => setModel(e.target.value)}
+                      style={{ width: '100%', fontSize: 11, padding: '4px 6px' }}
+                    >
+                      {ANTHROPIC_MODEL_OPTIONS.map(m => (
+                        <option key={m.id} value={m.id}>{m.label}</option>
+                      ))}
+                    </select>
+                  </div>
+                </>
+              )}
+
+              {/* Local-llama: 안내만 */}
+              {providerId === 'local-llama' && (
+                <div style={{
+                  padding: 8,
+                  background: 'rgba(137, 180, 250, 0.06)',
+                  border: '1px solid var(--accent)',
+                  borderLeft: '3px solid var(--accent)',
+                  borderRadius: 'calc(var(--radius) - 2px)',
+                  fontSize: 11, color: 'var(--text-secondary)',
+                  display: 'flex', alignItems: 'flex-start', gap: 6,
+                }}>
+                  <Cpu size={12} color="var(--accent)" style={{ marginTop: 2, flexShrink: 0 }} />
+                  <div>
+                    <strong style={{ color: 'var(--accent)' }}>로컬 디자인 엔진</strong> — Phase 11-B 작업 예정.
+                    <div style={{ marginTop: 3, fontSize: 10, color: 'var(--text-muted)' }}>
+                      llama.cpp sidecar + Gemma GGUF 번들이 통합되면 키 없이 바로 사용 가능.
+                    </div>
+                  </div>
+                </div>
+              )}
 
               {/* 프롬프트 */}
               <div>
@@ -320,12 +464,11 @@ export function SettingsModal({ onClose }: Props) {
                 />
               </div>
 
-              {/* 액션 */}
               <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
                 <button
                   className="btn btn-primary btn-sm"
                   onClick={handleGenerate}
-                  disabled={busy}
+                  disabled={busy || !selectedStatus?.ok}
                   style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 11 }}
                 >
                   {busy ? (
@@ -336,94 +479,19 @@ export function SettingsModal({ onClose }: Props) {
                 </button>
                 <button
                   className="btn btn-sm"
-                  onClick={() => { setGenOpen(false); handleDiscardPreview() }}
+                  onClick={() => setGenOpen(false)}
                   disabled={busy}
                   style={{ fontSize: 11 }}
                 >
                   닫기
                 </button>
               </div>
-
-              {/* 미리보기 */}
-              {preview && (
-                <div
-                  style={{
-                    border: '1px solid var(--mauve)',
-                    borderLeft: '3px solid var(--mauve)',
-                    borderRadius: 'calc(var(--radius) - 2px)',
-                    padding: 10,
-                    background: 'rgba(203, 166, 247, 0.06)',
-                  }}
-                >
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}>
-                    <Sparkles size={12} color="var(--mauve)" />
-                    <span style={{ fontSize: 12, fontWeight: 600 }}>{preview.name}</span>
-                    {previewWarning && (
-                      <span style={{
-                        fontSize: 10, color: 'var(--yellow)',
-                        display: 'inline-flex', alignItems: 'center', gap: 3,
-                      }}>
-                        <AlertTriangle size={10} /> {previewWarning}
-                      </span>
-                    )}
-                  </div>
-                  <div style={{ display: 'flex', gap: 3, marginBottom: 8, flexWrap: 'wrap' }}>
-                    {Object.entries(preview.tokens).map(([k, v]) => (
-                      <div
-                        key={k}
-                        title={`--${k}: ${v}`}
-                        style={{
-                          width: 18, height: 18, borderRadius: 3,
-                          background: v, border: '1px solid rgba(255,255,255,0.1)',
-                        }}
-                      />
-                    ))}
-                  </div>
-                  <div style={{ display: 'flex', gap: 4 }}>
-                    <button
-                      className="btn btn-sm"
-                      onClick={handleSavePreview}
-                      style={{
-                        display: 'inline-flex', alignItems: 'center', gap: 4,
-                        background: 'var(--green)', color: 'var(--bg-primary)', borderColor: 'var(--green)',
-                        fontSize: 10, padding: '4px 8px',
-                      }}
-                    >
-                      <Save size={11} /> 저장
-                    </button>
-                    <button
-                      className="btn btn-sm"
-                      onClick={() => handleCopyJson(preview)}
-                      style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 10, padding: '4px 8px' }}
-                    >
-                      <Copy size={11} /> JSON 복사
-                    </button>
-                    <button
-                      className="btn btn-sm"
-                      onClick={handleDiscardPreview}
-                      style={{ fontSize: 10, padding: '4px 8px' }}
-                    >
-                      취소
-                    </button>
-                    <div style={{ flex: 1 }} />
-                    <button
-                      className="btn btn-sm"
-                      onClick={handleGenerate}
-                      disabled={busy}
-                      title="다시 생성 (같은 프롬프트로)"
-                      style={{ fontSize: 10, padding: '4px 8px' }}
-                    >
-                      재생성
-                    </button>
-                  </div>
-                </div>
-              )}
             </div>
-          )}
-        </Section>
+          </Section>
+        )}
 
         <div style={{ marginTop: 4, fontSize: 10, color: 'var(--text-muted)' }}>
-          Esc 또는 외부 클릭으로 닫기
+          Esc 또는 외부 클릭으로 닫기 · 편집 중이면 미리보기 자동 복원
         </div>
       </div>
     </div>
@@ -431,7 +499,7 @@ export function SettingsModal({ onClose }: Props) {
 }
 
 function ThemeCard({
-  label, preview, accent, selected, onClick, onDelete, onCopy,
+  label, preview, accent, selected, onClick, onDelete, onCopy, onEdit,
 }: {
   label: string
   preview: string
@@ -440,6 +508,7 @@ function ThemeCard({
   onClick: () => void
   onDelete?: () => void
   onCopy?: () => void
+  onEdit?: () => void
 }) {
   return (
     <div
@@ -478,8 +547,21 @@ function ThemeCard({
         {label}
       </span>
       {selected && <Check size={12} color="var(--accent)" />}
-      {(onCopy || onDelete) && (
+      {(onCopy || onDelete || onEdit) && (
         <div style={{ display: 'inline-flex', gap: 2 }}>
+          {onEdit && (
+            <button
+              onClick={e => { e.stopPropagation(); onEdit() }}
+              aria-label="편집"
+              title="편집"
+              style={{
+                background: 'none', border: 'none', color: 'var(--mauve)',
+                cursor: 'pointer', padding: 2, display: 'flex',
+              }}
+            >
+              <Pencil size={11} />
+            </button>
+          )}
           {onCopy && (
             <button
               onClick={e => { e.stopPropagation(); onCopy() }}
@@ -545,10 +627,13 @@ function Hint({ children }: { children: React.ReactNode }) {
   )
 }
 
-/** 미리보기 시 즉시 토큰 적용 (저장하지 않고 인라인만) */
+/** 미리보기 — 저장하지 않고 인라인 토큰만 적용 */
 function applyInline(palette: ThemePalette) {
   document.documentElement.removeAttribute('data-theme')
   for (const [k, v] of Object.entries(palette.tokens)) {
     document.documentElement.style.setProperty(`--${k}`, v)
   }
 }
+
+// 사용 안 하지만 IDE 가 ThemeAiProvider 미사용 경고 안 내도록 (provider.label 등 직접 참조하므로 사실상 사용 중)
+export type { ThemeAiProvider }

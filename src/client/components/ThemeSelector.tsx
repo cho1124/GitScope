@@ -1,6 +1,6 @@
 // 이전엔 React 컴포넌트 ThemeSelector 가 있었지만 SettingsModal 통합 후 미사용 → 제거됨.
 // 모듈 이름은 유지(임포트 호환).
-import { TOKEN_KEYS, type TokenMap } from '../lib/themeGenerator'
+import { TOKEN_KEYS, type TokenMap } from '../lib/ai'
 
 export type BuiltinTheme = 'mocha' | 'latte' | 'frappe' | 'macchiato'
 

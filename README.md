@@ -192,6 +192,59 @@ GitScope/
 - **Code Maat** — CLI 전용, 시각화 없음
 - **GitScope** — 무료 + 로컬 + 시각화 + Git GUI 통합 + **심볼 단위 히스토리**
 
+## 로컬 디자인 엔진 방향
+
+GitScope의 AI 기능은 일반 챗봇을 붙이는 방향보다 **로컬 디자인 엔진 내장**으로 가져간다. 목표는 테마 커스터마이징을 앱의 고유 기능으로 만드는 것이며, 외부 서비스 의존 없이 로컬 모델이 Git GUI용 팔레트를 생성하고 수정하도록 한다.
+
+### 핵심 판단
+- **Ollama 의존은 피한다.** 설치/실행/model pull을 사용자에게 맡기면 앱 내장 기능이라기보다 외부 연동처럼 보인다.
+- **1차 구현은 `llama.cpp` sidecar + Gemma 계열 GGUF 모델**이 가장 현실적이다. `libllama`를 Rust에 직접 링크하는 방식은 더 깊은 내장이지만, Windows 배포와 GPU/CPU 빌드 분기, FFI 안정성 비용이 커서 후순위로 둔다.
+- 모델 자체를 처음부터 디자인 전용으로 학습하기보다, **디자인 전용 시스템 프롬프트 + 예시 팔레트 + JSON grammar + 코드 검증**으로 좁은 문제를 안정화한다.
+- 테마 생성은 범위가 좁으므로 거대한 모델보다 **Gemma 1B/2B급 instruct Q4 GGUF**로 먼저 검증한다. 고품질 모드는 이후 4B/7B 선택지로 확장한다.
+
+### 제안 아키텍처
+```text
+SettingsModal
+  -> invoke('generate_local_theme')
+    -> src-tauri/src/ai.rs
+      -> llama.cpp sidecar 실행/상태 확인
+      -> localhost OpenAI-compatible API 호출
+      -> ThemePalette JSON 파싱
+      -> WCAG/토큰 검증 및 필요 시 보정
+      -> 프론트로 14개 CSS 토큰 반환
+```
+
+### 구현 단계
+1. 기존 Anthropic 테마 생성기를 `ThemeAiProvider` 구조로 분리한다.
+   - `anthropic`은 선택적 BYOK provider로 유지 가능.
+   - 기본 방향은 `local-llama` provider.
+2. `src-tauri/src/ai.rs`를 추가한다.
+   - `get_ai_status`
+   - `start_local_model`
+   - `generate_local_theme`
+3. `llama-server`를 Tauri sidecar로 번들링한다.
+   - `src-tauri/tauri.conf.json`의 `bundle.externalBin` 사용.
+   - 모델 로딩 상태, 실패 원인, 포트 점유 상태를 UI에 노출.
+4. Gemma GGUF 모델 관리 정책을 정한다.
+   - 앱에 동봉할지, 첫 실행 시 사용자가 라이선스 동의 후 다운로드하게 할지 결정.
+   - Gemma 라이선스 조건 때문에 배포 방식은 별도 확인 필요.
+5. 출력 안정화를 코드에서 강제한다.
+   - 14개 토큰 누락 검증.
+   - hex 형식 검증.
+   - `text-primary`/`bg-primary` WCAG AA contrast 검사.
+   - dark/light 배경 luminance 검사.
+   - semantic color hue 분리 검사.
+6. 수동 커스터마이징 편집기를 붙인다.
+   - AI 생성만 있으면 뽑기 기능에 가깝다.
+   - 색상 picker, 토큰별 swatch, JSON import/export, contrast warning까지 있어야 테마 커스터마이징으로 느껴진다.
+7. AI 수정 명령을 지원한다.
+   - "이 테마를 더 어둡게"
+   - "accent만 파란 계열로"
+   - "대비를 더 올려줘"
+   - "GitHub Dark 느낌으로"
+
+### 포지셔닝
+이 기능은 "AI 챗봇 내장"이 아니라 **GitScope Local Design Engine**으로 표현한다. GitScope가 코드 히스토리와 Forensics를 로컬에서 분석하듯, 테마 디자인도 로컬 모델이 앱 내부에서 생성/수정하는 구조가 제품 정체성과 잘 맞는다.
 ## 개발 진행 상황
 
 | Phase | 범위 | 상태 |
@@ -216,6 +269,7 @@ GitScope/
 | **Phase 8-G-1** | **충돌 ours/theirs 빠른 해결 패널** | ✅ |
 | Phase 8-G-2 | 3-way side-by-side diff viewer (region 단위 해결) | 🔜 |
 | Phase 10 | Knowledge Graph + MCP (GitNexus 영감) | 🔜 |
+| Phase 11 | Local Design Engine: llama.cpp sidecar + Gemma GGUF 기반 로컬 테마 생성/수정 | 🔜 |
 
 상세 계획과 이어받기 가이드는 [DEVELOPMENT.md](DEVELOPMENT.md) 참고.
 
