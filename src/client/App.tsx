@@ -13,6 +13,7 @@ import { WelcomeScreen } from './components/WelcomeScreen'
 import { RepoSelector } from './components/RepoSelector'
 import { RemoteSyncButton } from './components/RemoteSyncButton'
 import { SettingsModal } from './components/SettingsModal'
+import { WindowControls } from './components/WindowControls'
 import { useToast } from './components/Toast'
 
 type Tab = 'changes' | 'commits' | 'forensics'
@@ -94,6 +95,11 @@ export default function App() {
   if (!repo) {
     return (
       <div className="app-container">
+        <div className="welcome-titlebar" data-tauri-drag-region>
+          <Logo />
+          <div style={{ flex: 1 }} data-tauri-drag-region />
+          <WindowControls />
+        </div>
         <WelcomeScreen onOpen={handleOpenRepo} opening={loading} />
       </div>
     )
@@ -102,6 +108,7 @@ export default function App() {
   return (
     <div className="app-container">
       <header className="app-header" style={{ gap: 8 }}>
+        <Logo />
         <RepoSelector
           currentPath={repo.path}
           currentName={repoNameFromPath(repo.path)}
@@ -124,13 +131,14 @@ export default function App() {
           />
         </div>
 
-        <div style={{ flex: 1 }} />
+        <div className="header-drag-spacer" data-tauri-drag-region style={{ flex: 1 }} />
 
         <IconButton
           icon={<SettingsIcon size={13} />}
           label="설정"
           onClick={() => setSettingsOpen(true)}
         />
+        <WindowControls />
       </header>
 
       <div className="app-body">
@@ -237,6 +245,47 @@ export default function App() {
       <StatusBar branch={repo.currentBranch} refreshKey={refreshKey} />
 
       {settingsOpen && <SettingsModal onClose={() => setSettingsOpen(false)} />}
+    </div>
+  )
+}
+
+/** 좌측 워드마크. 드래그 핸들 역할도 겸함. */
+function Logo() {
+  return (
+    <div
+      data-tauri-drag-region
+      style={{
+        display: 'inline-flex',
+        alignItems: 'center',
+        gap: 6,
+        padding: '4px 10px 4px 4px',
+        userSelect: 'none',
+        cursor: 'default',
+      }}
+    >
+      <span
+        aria-hidden
+        data-tauri-drag-region
+        style={{
+          width: 20,
+          height: 20,
+          borderRadius: 5,
+          background: 'linear-gradient(135deg, var(--mauve), var(--accent))',
+          display: 'inline-block',
+        }}
+      />
+      <span
+        data-tauri-drag-region
+        style={{
+          fontSize: 12,
+          fontWeight: 600,
+          letterSpacing: '0.3px',
+          color: 'var(--text-primary)',
+          fontFamily: 'var(--font-mono)',
+        }}
+      >
+        GitScope
+      </span>
     </div>
   )
 }

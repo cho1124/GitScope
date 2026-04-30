@@ -124,12 +124,45 @@ body {
 
 .app-header {
   display: flex;
-  align-items: center;
+  align-items: stretch;
   gap: 12px;
-  padding: 12px 16px;
-  min-height: 52px;
+  padding: 8px 0 8px 12px;
+  min-height: 44px;
   background: var(--bg-secondary);
   border-bottom: 1px solid var(--border);
+  user-select: none;
+}
+
+/* 헤더 안의 컨트롤들은 세로 가운데 정렬 (헤더 자체는 stretch) */
+.app-header > :not(.window-controls):not(.header-drag-spacer) {
+  align-self: center;
+}
+
+.header-drag-spacer {
+  align-self: stretch;
+  min-width: 12px;
+}
+
+/* WelcomeScreen 위 작은 타이틀 바 */
+.welcome-titlebar {
+  display: flex;
+  align-items: center;
+  min-height: 36px;
+  background: var(--bg-secondary);
+  border-bottom: 1px solid var(--border);
+  user-select: none;
+}
+
+/* 윈도우 컨트롤은 헤더의 우측 끝까지 채움 (높이/엣지 정렬) */
+.window-controls {
+  align-self: stretch;
+  margin-left: 4px;
+}
+
+/* drag region 표시 영역 안의 인터랙티브 요소들은 click 정상 동작하지만,
+   data-tauri-drag-region="false" 보장으로 클릭 이벤트 우선 */
+[data-tauri-drag-region] {
+  -webkit-user-select: none;
   user-select: none;
 }
 
