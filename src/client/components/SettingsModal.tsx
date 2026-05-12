@@ -23,6 +23,7 @@ import {
   useDateFormat, setDateFormat, type DateFormatMode,
   useRowPaddingY, setRowPaddingY,
   ROW_PADDING_MIN, ROW_PADDING_MAX, ROW_PADDING_DEFAULT,
+  useShowSpiceLevels, setShowSpiceLevels,
 } from '../lib/displaySettings'
 import {
   useDecorConfig, setDecorConfig,
@@ -61,6 +62,7 @@ export function SettingsModal({ onClose }: Props) {
   const [customThemes, setCustomThemes] = useState<CustomTheme[]>([])
   const dateFormat = useDateFormat()
   const rowPaddingY = useRowPaddingY()
+  const showSpice = useShowSpiceLevels()
   const decor = useDecorConfig()
 
   // provider 상태
@@ -424,6 +426,18 @@ export function SettingsModal({ onClose }: Props) {
                 style={{ width: '100%' }}
               />
               <Hint>커밋 리스트 한 행의 위/아래 여백. 그래프 라인 높이도 함께 늘어납니다.</Hint>
+            </div>
+
+            <div>
+              <label style={{ display: 'inline-flex', alignItems: 'center', gap: 6, cursor: 'pointer', userSelect: 'none', fontSize: 12 }}>
+                <input
+                  type="checkbox"
+                  checked={showSpice}
+                  onChange={e => setShowSpiceLevels(e.target.checked)}
+                />
+                <span>🌶️ 핫 페퍼 배지 표시</span>
+              </label>
+              <Hint>변경 잦은 파일 옆에 🌶️ 1~3개로 매운맛 등급 표시 (Forensics 핫스팟 score 의 상위 33% / 10% / 3% percentile).</Hint>
             </div>
           </div>
         </Section>

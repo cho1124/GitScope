@@ -83,6 +83,41 @@ export function useRowPaddingY(): number {
   return value
 }
 
+// ── 핫 페퍼 배지 표시 여부 ─────────────────────────────────
+const SPICE_LS_KEY = 'pepper.showSpiceLevels'
+const SPICE_EVENT = 'pepper:showSpiceLevels-changed'
+
+export function getShowSpiceLevels(): boolean {
+  try {
+    const v = localStorage.getItem(SPICE_LS_KEY)
+    return v === null ? true : v === 'true'
+  } catch {
+    return true
+  }
+}
+
+export function setShowSpiceLevels(value: boolean): void {
+  try { localStorage.setItem(SPICE_LS_KEY, String(value)) } catch {}
+  window.dispatchEvent(new CustomEvent(SPICE_EVENT, { detail: value }))
+}
+
+export function useShowSpiceLevels(): boolean {
+  const [value, setValue] = useState<boolean>(getShowSpiceLevels)
+  useEffect(() => {
+    const handler = () => setValue(getShowSpiceLevels())
+    window.addEventListener(SPICE_EVENT, handler)
+    const storageHandler = (e: StorageEvent) => {
+      if (e.key === SPICE_LS_KEY) setValue(getShowSpiceLevels())
+    }
+    window.addEventListener('storage', storageHandler)
+    return () => {
+      window.removeEventListener(SPICE_EVENT, handler)
+      window.removeEventListener('storage', storageHandler)
+    }
+  }, [])
+  return value
+}
+
 /** 앱 부팅 시 1회 호출 — :root에 CSS var 동기화 */
 export function initDisplaySettings(): void {
   const py = getRowPaddingY()

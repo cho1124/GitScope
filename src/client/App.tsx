@@ -17,6 +17,7 @@ import { BackgroundDecor } from './components/BackgroundDecor'
 import { WindowControls } from './components/WindowControls'
 import { onDragHandle } from './lib/dragRegion'
 import { useToast } from './components/Toast'
+import { HotspotProvider } from './lib/hotspotContext'
 
 type Tab = 'changes' | 'commits' | 'forensics'
 
@@ -145,6 +146,7 @@ export default function App() {
   }
 
   return (
+    <HotspotProvider repoPath={repo.path} refreshKey={refreshKey}>
     <div className="app-container">
       <BackgroundDecor />
       <header className="app-header" style={{ gap: 8 }} onMouseDown={onDragHandle}>
@@ -300,6 +302,7 @@ export default function App() {
 
       {settingsOpen && <SettingsModal onClose={() => setSettingsOpen(false)} />}
     </div>
+    </HotspotProvider>
   )
 }
 

@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { Folder, FolderOpen, FileText } from 'lucide-react'
 import { api, type FileTreeNode } from '../api'
+import { SpiceLevel } from './SpiceLevel'
 
 interface Props {
   onSelectFile: (path: string) => void
@@ -80,6 +81,7 @@ export function FileTree({ onSelectFile, selectedFile }: Props) {
             {isDir ? (isExpanded ? <FolderOpen size={14} /> : <Folder size={14} />) : <FileText size={14} />}
           </span>
           <span className="name">{node.name}</span>
+          {!isDir && <SpiceLevel path={node.path} />}
           {isLoading && (
             <span className="spinner" style={{ width: 10, height: 10, borderWidth: 1 }} />
           )}

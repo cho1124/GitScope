@@ -4,6 +4,7 @@ import { api, type StatusInfo } from '../api'
 import { DiffView } from './DiffView'
 import { useToast } from './Toast'
 import { StashAccordion } from './StashAccordion'
+import { SpiceLevel } from './SpiceLevel'
 import { getProvider, getSelectedProviderId } from '../lib/ai'
 
 interface Props {
@@ -326,6 +327,7 @@ export function CommitPanel({ onCommitDone }: Props) {
                     >
                       <span style={{ color: 'var(--yellow)', fontSize: '11px', fontFamily: 'var(--font-mono)' }}>M</span>
                       <span className="commit-message" style={{ fontFamily: 'var(--font-mono)', fontSize: '11px' }}>{file}</span>
+                      <SpiceLevel path={file} />
                       <button
                         className="btn btn-sm"
                         style={{ fontSize: '10px' }}
@@ -375,6 +377,7 @@ export function CommitPanel({ onCommitDone }: Props) {
                     >
                       <span style={{ color: 'var(--green)', fontSize: '11px' }}>✓</span>
                       <span className="commit-message" style={{ fontFamily: 'var(--font-mono)', fontSize: '11px' }}>{file}</span>
+                      <SpiceLevel path={file} />
                       <button
                         className="btn btn-sm"
                         style={{ fontSize: '10px' }}
