@@ -1,0 +1,49 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <defs>
+    <linearGradient id="pepperGrad" x1="0.3" y1="0" x2="0.7" y2="1">
+      <stop offset="0%" stop-color="#F87171"/>
+      <stop offset="40%" stop-color="#DC2626"/>
+      <stop offset="100%" stop-color="#7F1D1D"/>
+    </linearGradient>
+    <linearGradient id="stemGrad" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#22C55E"/>
+      <stop offset="100%" stop-color="#15803D"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Stem -->
+  <path d="M 560 130
+           Q 530 160, 510 200
+           Q 495 240, 490 280"
+        stroke="url(#stemGrad)"
+        stroke-width="42"
+        stroke-linecap="round"
+        fill="none"/>
+
+  <!-- Small leaf -->
+  <ellipse cx="600" cy="180" rx="38" ry="20"
+           transform="rotate(-25 600 180)"
+           fill="#22C55E"/>
+
+  <!-- Calyx (where stem meets pepper) -->
+  <ellipse cx="490" cy="295" rx="60" ry="26"
+           transform="rotate(-12 490 295)"
+           fill="#15803D"/>
+
+  <!-- Pepper body - slightly bent S-curve, classic chili silhouette -->
+  <path d="M 450 295
+           C 580 305, 700 410, 720 560
+           C 735 700, 680 820, 560 870
+           C 430 900, 320 870, 280 770
+           C 260 680, 310 580, 380 490
+           C 420 420, 440 360, 450 295 Z"
+        fill="url(#pepperGrad)"/>
+
+  <!-- Subtle highlight on right side (where pepper bulges more) -->
+  <path d="M 600 450
+           C 580 530, 570 630, 590 710
+           C 605 640, 630 555, 660 480
+           C 655 465, 625 455, 600 450 Z"
+        fill="#FECACA"
+        opacity="0.4"/>
+</svg>

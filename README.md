@@ -1,37 +1,42 @@
-# Pepper
+# 🌶️ Pepper
 
-Code Forensics 시각화와 **심볼 단위 히스토리**를 내장한 **로컬 데스크톱 Git GUI** (Tauri 기반).
+> 내장 AI · Code Forensics · 심볼 단위 히스토리를 갖춘 친근한 로컬 데스크톱 Git GUI.
+> **Tauri 2 + Rust + React + 로컬 GGUF 모델** — 외부 클라우드 의존 없이 코드의 매운맛까지 분석합니다.
 
 ![Tauri](https://img.shields.io/badge/Tauri-2.10-24c8db.svg)
 ![React](https://img.shields.io/badge/React-18-61dafb.svg)
 ![Rust](https://img.shields.io/badge/Rust-1.95+-dea584.svg)
+![On-device AI](https://img.shields.io/badge/AI-on--device-ff6b35.svg)
 ![License](https://img.shields.io/badge/License-MIT-green.svg)
 
 ## 다운로드
 
-**[최신 릴리즈 → v0.4.0](https://github.com/cho1124/Pepper/releases/latest)**  
-(AI 테마 생성기 · 헤더 리디자인 · 커스텀 타이틀 바)
+**[최신 릴리즈 → v0.5.0](https://github.com/cho1124/Pepper/releases/latest)**
+(GitScope → Pepper 리브랜딩 · llama.cpp 내장 AI · AI 커밋 메시지 · AI 심볼 요약 · 배경 데코)
 
-| 파일 | 크기 | 설명 |
-|------|------|------|
-| `Pepper_x.y.z_x64-setup.exe` | ~2 MB | NSIS 설치 (권장) |
-| `Pepper_x.y.z_x64_en-US.msi` | ~3 MB | MSI 설치 (기업 배포용) |
+| 파일                          | 크기  | 설명               |
+|-------------------------------|-------|--------------------|
+| `Pepper_x.y.z_x64-setup.exe`  | ~4 MB | NSIS 설치 (권장)   |
+| `Pepper_x.y.z_x64_en-US.msi`  | ~6 MB | MSI 설치 (기업용)  |
 
 > ⚠ 코드 서명이 없어 Windows SmartScreen 경고가 뜹니다.
 > "추가 정보" → "실행"을 클릭하면 설치됩니다.
+>
+> ℹ️ 이전 이름 `GitScope` 시절 데이터(모델/설정/최근 레포)는 첫 실행 시 `pepper/` 디렉토리로 자동 마이그레이션됩니다.
 
 ## 주요 기능
 
 ### 기본 Git 작업
 | 기능 | 설명 |
 |------|------|
-| **커밋 로그** | 페이지네이션 (100개씩), ↑↓ 또는 j/k 키보드 네비게이션 |
-| **Diff 뷰** | 400줄 이상 자동 virtualization (react-window) |
-| **변경사항 관리** | Stage → Commit → Push/Pull + 파일 클릭 시 working tree diff 미리보기 |
+| **커밋 로그** | 페이지네이션 (100개씩), ↑↓ 또는 j/k 키보드 네비게이션, `--all` 전체 브랜치 토글, 행 세로 여백 슬라이더 |
+| **Diff 뷰** | 400줄 이상 자동 virtualization (react-window), **hunk 단위 stage/unstage** |
+| **변경사항 관리** | Stage → Commit → Push/Pull · 파일 클릭 시 working tree diff 미리보기 · **Ctrl/Shift 클릭으로 다중 선택** |
 | **브랜치** | 생성 / 전환 / 머지 (--no-ff 옵션) / 삭제 (force 옵션) |
 | **Stash** | save (untracked 포함 옵션) / apply / pop / drop / diff 미리보기 |
 | **파일 히스토리** | `git log --follow` 기반 타임라인 + 커밋 클릭 시 diff 전환 |
 | **태그 표시** | 커밋 로그에 HEAD/브랜치/리모트/태그 pill 분리 |
+| **원격 동기화** | fetch · pull · push 통합 버튼 + 상태 pill (5초 폴링으로 ahead/behind 자동 표시) |
 
 ### 심볼 단위 히스토리 (차별점) ⭐
 일반 Git GUI는 파일 단위 추적만 가능. Pepper는 **Tree-sitter + `git log -L`** 로 **함수/클래스/메서드 단위 히스토리**를 제공합니다.
@@ -45,24 +50,40 @@ Code Forensics 시각화와 **심볼 단위 히스토리**를 내장한 **로컬
 
 파일 히스토리 탭에서 심볼을 고르면 **그 심볼이 변경된 커밋만** 필터링됩니다. 리팩토링 히스토리 추적, 특정 함수의 의도 변화 파악, 인수인계에 유용합니다.
 
-### AI 테마 생성기 (v0.4.0 신규) 🆕
-자연어 한 줄로 Pepper 전용 팔레트를 생성합니다. **`ThemeAiProvider`** 추상화로 BYOK(Anthropic API)와 추후 로컬 LLM(llama.cpp + Gemma GGUF)을 같은 인터페이스로 다룹니다.
+### 내장 로컬 AI (v0.5.0 신규) 🆕
+**llama.cpp sidecar + GGUF 모델**을 앱이 직접 관리합니다. 외부 ollama / API 키 / 클라우드 의존 없이 완전히 로컬에서 동작합니다.
+
+| 항목 | 설명 |
+|---|---|
+| **llama.cpp 자동 통합** | 최신 릴리즈를 자동 다운로드(~50MB) · 포트 27182부터 가용 포트 자동 선택 · `/health` 폴링으로 ready 대기 · 메인 프로세스 종료 시 자동 정리 |
+| **GGUF 모델 카탈로그** | **Qwen 2.5 Coder 3B Q4_K_M** (추천, ~2GB, 코딩 특화) · Qwen 2.5 Coder 1.5B (~1GB, 가벼움) |
+| **`ThemeAiProvider` 추상화** | 로컬 / Anthropic BYOK 둘 다 같은 인터페이스로 호출 — `generate` · `refine` · `generateDecor` · `generateCommitMessage` · `summarizeSymbolHistory` 5개 메서드 |
+| **OpenAI-compatible API** | 프론트에서 `localhost:port/v1/chat/completions` 로 직접 호출, Rust는 라이프사이클만 관리 |
+| **StatusBar AI 칩** | 우측 `AI off` 클릭 → 30초 워밍업 후 `AI · :PORT` 표시 |
+
+### AI 차별화 기능 (v0.5.0 신규) 🆕
+로컬 AI를 단순 챗봇이 아니라 **Git 워크플로우 깊이 통합**합니다.
 
 | 기능 | 설명 |
-|------|------|
-| **자연어 생성** | "어두운 사이버펑크 분위기" 같은 문장 → Catppuccin 호환 14개 토큰 자동 생성 |
-| **수동 팔레트 편집기** | 토큰별 color picker · `auditPalette()`로 대비/조화/luminance 자동 검증 |
-| **커스텀 테마 라이브러리** | 생성한 테마 저장/불러오기/삭제 (localStorage) |
-| **Provider 추상화** | Anthropic BYOK 기본, 로컬 LLM provider는 Phase 11-B에서 추가 예정 |
+|---|---|
+| **AI 커밋 메시지 생성** | 변경사항 탭 → 파일 stage → 힌트 입력(선택) → `✨ AI 생성` → conventional commit 한국어 subject/body 자동 분리. staged diff 기반 |
+| **AI 심볼 진화 요약** | 좌측 심볼 히스토리 탭 → 심볼 선택 → `✨ AI 요약` → 함수/클래스의 `git log -L` 결과 → 자연어 narrative (요약 / 주요 변화 bullets / 현재 상태) |
+| **AI 테마 생성기** | 자연어 ("어두운 사이버펑크 분위기") → Catppuccin 호환 14개 토큰 자동 생성 + `auditPalette()` 검증 |
+| **AI 배경 데코 생성** | "고양이가 떠다니는" → `customIcons=["Cat","PawPrint"]` 자동 매핑 |
 
-> 자세한 방향성은 [로컬 디자인 엔진 방향](#로컬-디자인-엔진-방향) 섹션 참고.
+### 배경 데코 시스템 (v0.5.0 신규) 🎨
+설정창 토글로 켜는 **떠다니는 아이콘 배경**. 시드 기반 파티클 시스템으로 결정적 렌더링.
 
-### 커스텀 타이틀 바 (v0.4.0 신규) 🆕
+- **3가지 drift 모드** — 자유 / 위로 / 아래로
+- **9개 옵션** — 농도 · 속도 · 투명도 · 크기 · 색상 · 방향 · 아이콘 종류 등
+- **36개 아이콘 풀** — git · code · minimal · fun (Cat, Dog, PawPrint 등) · custom (직접 지정)
+
+### 커스텀 타이틀 바 (v0.4.0)
 Linear / Discord 스타일의 통합 헤더. `decorations: false` 윈도우에 **자체 윈도우 컨트롤**을 그리고 헤더 전체를 드래그 영역으로 사용합니다.
 
 - 🪟 **통합 헤더** — 로고 · 레포 · 브랜치 · 원격 동기화 · 설정 · 윈도우 컨트롤이 한 줄
-- 🔄 **통합 RemoteSyncButton** — 기존 fetch/pull/push/refresh 4버튼을 1개로. 5초 폴링으로 ahead/behind 자동 표시
-- 📑 **탭 재정렬** — Stash 패널을 변경사항 탭에 흡수, 메인 탭은 변경사항 / 커밋 로그 / Forensics 3개로 정리
+- 🔄 **통합 RemoteSyncButton** — fetch/pull/push/refresh 4버튼을 1개로 + 상태 pill
+- 📑 **탭 재정렬** — Stash 패널을 변경사항 탭에 흡수, 메인 탭은 변경사항 / 커밋 로그 / Forensics 3개
 
 ### 고급 Git 액션 (v0.3.0)
 커밋 로그에서 **우클릭** 한 번으로 모든 고급 작업 수행:
@@ -89,12 +110,12 @@ Linear / Discord 스타일의 통합 헤더. `decorations: false` 윈도우에 *
 ### UX
 - **Catppuccin 4 flavor + AI 생성/수동 팔레트** — Mocha / Latte / Frappé / Macchiato + 커스텀 테마 (localStorage 저장)
 - **Lucide SVG** 아이콘 시스템 (이모지 미사용, OS 의존성 제거)
-- **토스트** 알림 (info / success / error / warn)
-- **커스텀 확인 모달** (Enter/Esc 지원)
+- **사이드바 드래그 리사이저** (180~600px, 더블클릭으로 기본값 리셋)
+- **날짜 포맷 토글** — 상대 / 절대 (설정창)
+- **토스트** 알림 (info / success / error / warn) + **커스텀 확인 모달** (Enter/Esc)
 - **키보드 단축키**: Ctrl+1~3 탭 전환, F5 새로고침, ↑↓/j·k 리스트 네비
-- **최근 레포 목록** (AppData에 최대 10개 저장)
-- **네이티브 폴더 다이얼로그** (tauri-plugin-dialog)
-- **WebView2 컨텍스트 메뉴 차단** — 우클릭 시 브라우저 기본 메뉴가 커스텀 메뉴를 가리던 문제 해결
+- **최근 레포 목록** (AppData에 최대 10개 저장) + 네이티브 폴더 다이얼로그
+- **WebView2 컨텍스트 메뉴 차단** — 우클릭 시 브라우저 기본 메뉴 차단
 
 ## 기술 스택
 
@@ -104,9 +125,10 @@ Linear / Discord 스타일의 통합 헤더. `decorations: false` 윈도우에 *
 | Frontend | React 18 + TypeScript + Vite 6 |
 | Backend | Rust (`std::process::Command` 로 git CLI 래핑) |
 | AST 파싱 | tree-sitter + TS/Rust/Python/C# grammar |
+| **로컬 AI** | **llama.cpp sidecar + Qwen 2.5 Coder GGUF** (OpenAI-compatible HTTP) |
 | 아이콘 | lucide-react |
 | Virtualization | react-window 2.x |
-| 테마 | Catppuccin (4 flavor) |
+| 테마 | Catppuccin (4 flavor) + 커스텀 (AI 생성 / 수동 편집) |
 
 ## 빠른 시작 (개발자)
 
@@ -143,14 +165,13 @@ npm run build
 
 1. 앱 실행 → **폴더 선택** 버튼으로 레포 선택 (또는 경로 직접 입력)
 2. 이후 접속은 웰컴 화면의 **최근 레포** 목록에서 클릭
-3. **변경사항** 탭 — 파일 클릭 → working tree diff 미리보기 → Stage → 커밋. 하단 패널에서 **Stash** save / apply / pop / drop
-4. **커밋 로그** 탭 — 커밋 클릭 → diff 표시 (↑↓ 또는 j/k로 이동) · 우클릭으로 cherry-pick / reset / rebase 등 고급 액션
-5. **Code Forensics** 탭 — 히트맵 · 핫스팟 · 트렌드 · 기여자 분석 (HEAD 캐싱 + 진행률)
-6. 헤더의 **레포 셀렉터** — 다른 레포로 즉시 전환 (최근 레포 목록 포함)
-7. 헤더의 **브랜치 드롭다운** — 전환 / 생성 / 머지 / 삭제
-8. 헤더의 **원격 동기화 버튼** — fetch / pull / push 통합 (5초 폴링으로 ahead/behind 표시)
-9. 헤더의 **설정 버튼** — 테마 전환 (Mocha / Latte / Frappé / Macchiato + AI 생성 / 수동 편집), API key 등록
-10. 좌측 **심볼 히스토리** 사이드바 → 파일 선택 → 함수/클래스 단위 변경 커밋만 필터링
+3. **AI 워밍업**: StatusBar 우측 `AI off` 칩 → 시작 → 30초 후 `AI · :PORT` 표시 (첫 실행 시 모델 ~2GB 다운로드)
+4. **변경사항** 탭 — 파일 클릭 → working tree diff → Stage (hunk 단위 가능) → `✨ AI 생성`으로 커밋 메시지 자동 작성 → 커밋. 하단 패널에서 **Stash** save / apply / pop / drop
+5. **커밋 로그** 탭 — 커밋 클릭 → diff 표시 (↑↓ 또는 j/k로 이동) · 우클릭으로 cherry-pick / reset / rebase 등 고급 액션 · `--all` 토글로 전체 브랜치 보기
+6. **Code Forensics** 탭 — 히트맵 · 핫스팟 · 트렌드 · 기여자 분석 (HEAD 캐싱 + 진행률)
+7. 헤더의 **레포 셀렉터 / 브랜치 / 원격 동기화 / 설정** — 한 줄에서 모두 접근
+8. **설정창** — 테마 (4 flavor + AI 생성 + 수동 편집) · AI 모델 관리 · 배경 데코 · 날짜 포맷
+9. 좌측 **심볼 히스토리** 사이드바 → 파일 선택 → 함수/클래스 단위 변경 커밋만 필터링 → `✨ AI 요약`으로 진화 narrative 생성
 
 ## 프로젝트 구조
 
@@ -158,47 +179,59 @@ npm run build
 Pepper/
 ├── src-tauri/                       # Rust 백엔드
 │   ├── src/
-│   │   ├── main.rs                 # entry
-│   │   ├── lib.rs                  # AppState + 커맨드 등록
-│   │   ├── git.rs                  # 기본 git 명령 (cherry-pick / reset / rebase / fetch 등)
-│   │   ├── stash.rs                # stash + working tree diff
-│   │   ├── forensics.rs            # Forensics 4종 + HEAD 캐싱 + 진행률 스트리밍
-│   │   ├── symbols.rs              # Tree-sitter 심볼 파싱 + git log -L
-│   │   └── recent.rs               # 최근 레포 저장 (AppData JSON)
-│   ├── capabilities/default.json    # dialog + window action 권한 (start-dragging/minimize/toggle-maximize/close)
+│   │   ├── main.rs                  # entry
+│   │   ├── lib.rs                   # AppState + 커맨드 등록
+│   │   ├── git.rs                   # 기본 git 명령 (cherry-pick / reset / rebase / fetch 등)
+│   │   ├── stash.rs                 # stash + working tree diff + hunk staging
+│   │   ├── forensics.rs             # Forensics 4종 + HEAD 캐싱 + 진행률 스트리밍
+│   │   ├── symbols.rs               # Tree-sitter 심볼 파싱 + git log -L
+│   │   ├── recent.rs                # 최근 레포 저장 (AppData JSON)
+│   │   └── ai/                      # 로컬 AI 모듈 (Phase 11-B)
+│   │       ├── mod.rs
+│   │       ├── catalog.rs           # GGUF 모델 카탈로그
+│   │       ├── download.rs          # llama.cpp + 모델 다운로드 + SHA 검증
+│   │       ├── paths.rs             # AppData/pepper/ 경로 관리 + GitScope 마이그레이션
+│   │       ├── server.rs            # llama.cpp sidecar 라이프사이클 + 포트 선택
+│   │       └── commands.rs          # Tauri invoke 핸들러
+│   ├── capabilities/default.json
 │   ├── Cargo.toml
-│   └── tauri.conf.json              # decorations: false (커스텀 타이틀 바)
+│   └── tauri.conf.json              # decorations: false
 ├── src/client/                      # React 프론트엔드
-│   ├── App.tsx                      # 통합 헤더 (drag region + WindowControls + RemoteSyncButton)
+│   ├── App.tsx                      # 통합 헤더 + 배경 데코 마운트
 │   ├── api.ts                       # invoke 래퍼 + 공통 타입
 │   ├── global.css                   # Catppuccin 4 flavor + 디자인 토큰
 │   ├── main.tsx                     # ToastProvider + ConfirmProvider + initial theme
 │   ├── lib/
-│   │   ├── dragRegion.ts            # 명시적 startDragging 핸들러 (Tauri 2 함정 회피)
+│   │   ├── dragRegion.ts
 │   │   ├── graph.ts                 # 브랜치 lane 알고리즘
 │   │   └── ai/                      # ThemeAiProvider 추상화
-│   │       ├── types.ts             # ThemeAiProvider 인터페이스 + ThemePalette 타입
-│   │       ├── anthropic.ts         # Anthropic SDK BYOK provider
-│   │       ├── local.ts             # llama.cpp 로컬 provider 스텁 (Phase 11-B)
-│   │       └── validation.ts        # auditPalette() — 대비/luminance/hue 검증
+│   │       ├── types.ts             # 5개 메서드 인터페이스
+│   │       ├── anthropic.ts         # Anthropic BYOK provider
+│   │       ├── local.ts             # llama.cpp 로컬 provider (5개 메서드 전체 구현)
+│   │       ├── validation.ts        # auditPalette() 검증
+│   │       └── index.ts             # provider 선택 / 초기화
 │   └── components/
 │       ├── WelcomeScreen.tsx
-│       ├── WindowControls.tsx       # 최소화 / 최대화 / 닫기 (커스텀 타이틀 바)
-│       ├── RemoteSyncButton.tsx     # fetch/pull/push/refresh 통합 + 5초 폴링
-│       ├── RepoSelector.tsx         # 헤더 레포 셀렉터 + 최근 레포
-│       ├── BranchSelector.tsx       # 헤더 브랜치 드롭다운
-│       ├── SettingsModal.tsx        # 테마 + API key 통합 설정
-│       ├── ThemeSelector.tsx        # 4 flavor + 커스텀 + AI 생성 진입점
-│       ├── ManualPaletteEditor.tsx  # 토큰별 picker + auditPalette 결과 표시
-│       ├── CommitLog.tsx            # pagination + 키보드 네비 + 우클릭 메뉴
-│       ├── CommitPanel.tsx          # Stage + 커밋 + diff 미리보기
-│       ├── StashAccordion.tsx       # 변경사항 탭 내 Stash 패널
-│       ├── DiffView.tsx             # react-window virtualization
-│       ├── FileTree.tsx             # lazy loading (expand 시점 로드)
-│       ├── FileHistory.tsx          # 심볼 드롭다운 통합
+│       ├── WindowControls.tsx
+│       ├── BackgroundDecor.tsx      # 시드 기반 파티클 + 36 아이콘 풀
+│       ├── LocalAiSettings.tsx      # 모델 다운로드 진행률 + 시작/종료
+│       ├── RemoteSyncButton.tsx
+│       ├── RepoSelector.tsx
+│       ├── BranchSelector.tsx
+│       ├── SettingsModal.tsx
+│       ├── ThemeSelector.tsx
+│       ├── ManualPaletteEditor.tsx
+│       ├── CommitLog.tsx
+│       ├── CommitGraph.tsx
+│       ├── CommitPanel.tsx          # AI 커밋 메시지 진입점
+│       ├── StashAccordion.tsx
+│       ├── StashPanel.tsx
+│       ├── DiffView.tsx             # hunk 단위 stage 버튼
+│       ├── FileTree.tsx
+│       ├── FileHistory.tsx          # AI 심볼 요약 진입점
 │       ├── InteractiveRebaseModal.tsx
-│       ├── StatusBar.tsx            # 5초 폴링
-│       ├── ForensicsDashboard.tsx   # 카드별 AsyncState + progress
+│       ├── StatusBar.tsx            # AI 상태 칩
+│       ├── ForensicsDashboard.tsx
 │       ├── Toast.tsx
 │       ├── ConfirmModal.tsx
 │       └── forensics/
@@ -207,7 +240,7 @@ Pepper/
 │           ├── TrendChart.tsx
 │           └── ContributorCard.tsx
 ├── package.json
-├── vite.config.ts
+├── vite.config.ts                   # src-tauri/target/ watch 제외 필수
 └── tsconfig.json
 ```
 
@@ -225,95 +258,60 @@ Pepper/
 유사 도구:
 - **CodeScene** — SaaS, 유료, 커뮤니티 에디션 2023년 종료
 - **Code Maat** — CLI 전용, 시각화 없음
-- **Pepper** — 무료 + 로컬 + 시각화 + Git GUI 통합 + **심볼 단위 히스토리**
+- **Pepper** — 무료 + 로컬 + 시각화 + Git GUI 통합 + **심볼 단위 히스토리** + **내장 AI**
 
-## 로컬 디자인 엔진 방향
+## 로컬 디자인 엔진 (Pepper Local Design Engine)
 
-Pepper의 AI 기능은 일반 챗봇을 붙이는 방향보다 **로컬 디자인 엔진 내장**으로 가져간다. 목표는 테마 커스터마이징을 앱의 고유 기능으로 만드는 것이며, 외부 서비스 의존 없이 로컬 모델이 Git GUI용 팔레트를 생성하고 수정하도록 한다.
+Pepper의 AI는 일반 챗봇을 붙이는 방향이 아니라 **앱에 내장된 좁은 도구**로 설계했습니다. Git 컨텍스트 (diff, 커밋 메타, 심볼 변경 이력)를 로컬 모델에 그대로 전달하고, 출력은 코드에서 검증·강제합니다.
 
 ### 핵심 판단
-- **Ollama 의존은 피한다.** 설치/실행/model pull을 사용자에게 맡기면 앱 내장 기능이라기보다 외부 연동처럼 보인다.
-- **1차 구현은 `llama.cpp` sidecar + Gemma 계열 GGUF 모델**이 가장 현실적이다. `libllama`를 Rust에 직접 링크하는 방식은 더 깊은 내장이지만, Windows 배포와 GPU/CPU 빌드 분기, FFI 안정성 비용이 커서 후순위로 둔다.
-- 모델 자체를 처음부터 디자인 전용으로 학습하기보다, **디자인 전용 시스템 프롬프트 + 예시 팔레트 + JSON grammar + 코드 검증**으로 좁은 문제를 안정화한다.
-- 테마 생성은 범위가 좁으므로 거대한 모델보다 **Gemma 1B/2B급 instruct Q4 GGUF**로 먼저 검증한다. 고품질 모드는 이후 4B/7B 선택지로 확장한다.
-
-### 제안 아키텍처
-```text
-SettingsModal
-  -> invoke('generate_local_theme')
-    -> src-tauri/src/ai.rs
-      -> llama.cpp sidecar 실행/상태 확인
-      -> localhost OpenAI-compatible API 호출
-      -> ThemePalette JSON 파싱
-      -> WCAG/토큰 검증 및 필요 시 보정
-      -> 프론트로 14개 CSS 토큰 반환
-```
+- **외부 ollama 의존을 제거합니다.** 사용자에게 ollama 설치/실행/`ollama pull`을 맡기면 외부 연동처럼 보입니다 — Pepper는 llama.cpp 바이너리와 GGUF 모델을 직접 관리합니다.
+- **llama.cpp sidecar + GGUF**가 Windows 배포에 가장 안전합니다. `libllama` Rust FFI 방식은 GPU/CPU 빌드 분기, FFI 안정성 비용이 커서 후순위로 둡니다.
+- **Qwen 2.5 Coder 3B Q4_K_M** — 코딩 컨텍스트 이해 + JSON 출력 + 한국어 OK + ~2GB. Phi-4-mini / Gemma 3 보다 코딩 특화로 선택.
+- 거대한 모델보다 **좁은 시스템 프롬프트 + 예시 + JSON grammar + 코드 검증**으로 작은 모델을 안정화합니다.
 
 ### 구현 단계
+1. ~~`ThemeAiProvider` 추상화로 Anthropic BYOK 분리~~ ✅ **Phase 11-A (v0.4.0)**
+2. ~~`src-tauri/src/ai/` 모듈: 카탈로그 · 다운로드 · sidecar 라이프사이클~~ ✅ **Phase 11-B-1 (v0.5.0)**
+3. ~~llama.cpp sidecar 자동 다운로드 + 가용 포트 자동 선택~~ ✅ **Phase 11-B-1 (v0.5.0)**
+4. ~~GGUF 모델 카탈로그 + 라이선스 동의 후 첫 실행 시 다운로드~~ ✅ **Phase 11-B-1 (v0.5.0)**
+5. ~~출력 안정화 (14 토큰 누락 검증 · hex 검증 · WCAG AA contrast · luminance · hue 분리)~~ ✅ **Phase 11-A**
+6. ~~수동 팔레트 편집기 (`ManualPaletteEditor`)~~ ✅ **Phase 11-A**
+7. ~~AI 커밋 메시지 · AI 심볼 진화 요약 · AI 배경 데코 생성~~ ✅ **Phase 11-B-2 / 11-D (v0.5.0)**
+8. AI refine — 자연어 테마 수정 ("더 어둡게", "accent 파란색") 🔜 **Phase 11-C**
 
-1. ~~기존 Anthropic 테마 생성기를 `ThemeAiProvider` 구조로 분리한다.~~ ✅ **Phase 11-A (v0.4.0)**
-   - `anthropic`은 선택적 BYOK provider로 유지 가능.
-   - 기본 방향은 `local-llama` provider.
-2. `src-tauri/src/ai.rs`를 추가한다. **(Phase 11-B 예정)**
-   - `get_ai_status`
-   - `start_local_model`
-   - `generate_local_theme`
-3. `llama-server`를 Tauri sidecar로 번들링한다. **(Phase 11-B 예정)**
-   - `src-tauri/tauri.conf.json`의 `bundle.externalBin` 사용.
-   - 모델 로딩 상태, 실패 원인, 포트 점유 상태를 UI에 노출.
-4. Gemma GGUF 모델 관리 정책을 정한다. **(Phase 11-B 예정)**
-   - 앱에 동봉할지, 첫 실행 시 사용자가 라이선스 동의 후 다운로드하게 할지 결정.
-   - Gemma 라이선스 조건 때문에 배포 방식은 별도 확인 필요.
-5. ~~출력 안정화를 코드에서 강제한다.~~ ✅ **Phase 11-A (`auditPalette()` 구현 완료)**
-   - 14개 토큰 누락 검증.
-   - hex 형식 검증.
-   - `text-primary`/`bg-primary` WCAG AA contrast 검사.
-   - dark/light 배경 luminance 검사.
-   - semantic color hue 분리 검사.
-6. ~~수동 커스터마이징 편집기를 붙인다.~~ ✅ **Phase 11-A (`ManualPaletteEditor` 구현 완료)**
-   - AI 생성만 있으면 뽑기 기능에 가깝다.
-   - 색상 picker, 토큰별 swatch, JSON import/export, contrast warning까지 있어야 테마 커스터마이징으로 느껴진다.
-7. AI 수정 명령을 지원한다. **(Phase 11-C 예정 — `provider.refine({base, instruction})` 인터페이스 이미 정의됨)**
-   - "이 테마를 더 어둡게"
-   - "accent만 파란 계열로"
-   - "대비를 더 올려줘"
-   - "GitHub Dark 느낌으로"
-
-### 포지셔닝
-이 기능은 "AI 챗봇 내장"이 아니라 **Pepper Local Design Engine**으로 표현한다. Pepper가 코드 히스토리와 Forensics를 로컬에서 분석하듯, 테마 디자인도 로컬 모델이 앱 내부에서 생성/수정하는 구조가 제품 정체성과 잘 맞는다.
 ## 개발 진행 상황
 
 | Phase | 범위 | 상태 |
 |-------|------|------|
 | Phase 0-3 | Tauri 마이그레이션 (Express→Rust) + Forensics | ✅ |
-| Phase 4-1 | 브랜치 UI + long path strip | ✅ |
-| Phase 4-2 | 폴더 dialog + 최근 레포 + FileTree lazy | ✅ |
-| Phase 4-3 | stash + working tree diff + tag pill | ✅ |
+| Phase 4-1/2/3 | 브랜치 UI + 최근 레포 + lazy FileTree + stash | ✅ |
 | Phase 5 | 토스트 + ConfirmModal + pagination + 키보드 네비 + Forensics 개별 로딩 | ✅ |
 | Phase 6 | Lucide 아이콘 + Diff virtualization + CSS 토큰 | ✅ |
 | Phase 7-1 | Forensics 진행률 스트리밍 (tauri::ipc::Channel) | ✅ |
 | Phase 7-2 | 테마 전환 (Catppuccin 4 flavor) | ✅ |
-| **Phase 9-A/B** | **심볼 단위 히스토리 (Tree-sitter + `git log -L`)** | ✅ |
-| **Phase 9-C** | **Python + C# 언어 지원 확장** | ✅ |
-| Phase 9-D | 리네임/이동 추적 — `git log -L` 가 자동 처리 확인 후 종료 | ✅ |
-| **Phase 8-A** | **Cherry-pick (단일 + 충돌 처리 + merge `-m 1`)** | ✅ |
-| **Phase 8-B** | **Reset (soft / mixed / hard, 위험도 차등 ConfirmModal)** | ✅ |
-| **Phase 8-C** | **Rebase 비-interactive (충돌 시 ProgressBanner)** | ✅ |
-| **Phase 8-D** | **Interactive rebase MVP (reorder + drop, cherry-pick 체인 + 자동 롤백)** | ✅ |
-| **Phase 8-E** | **Interactive rebase reword** | ✅ |
-| **Phase 8-F** | **Interactive rebase squash + fixup** | ✅ |
-| **Phase 8-G-1** | **충돌 ours/theirs 빠른 해결 패널** | ✅ |
+| Phase 9-A/B/C | 심볼 단위 히스토리 (Tree-sitter + `git log -L`, TS/TSX/JS/Rust/Python/C#) | ✅ |
+| Phase 9-D | 리네임/이동 추적 — `git log -L` 자동 처리 확인 후 종료 | ✅ |
+| Phase 8-A~F | Cherry-pick / Reset 3종 / Rebase / Interactive rebase 5액션 | ✅ |
+| Phase 8-G-1 | 충돌 ours/theirs 빠른 해결 패널 | ✅ |
+| Phase 11-A | `ThemeAiProvider` 추상화 + 수동 팔레트 편집기 + auditPalette 검증 | ✅ |
+| 커스텀 타이틀 바 | `decorations: false` + WindowControls + 통합 RemoteSyncButton (v0.4.0) | ✅ |
+| **Phase 11-B-1** | **llama.cpp sidecar + Qwen GGUF 모델 카탈로그 (v0.5.0)** | ✅ |
+| **Phase 11-B-2** | **AI 커밋 메시지 + AI 심볼 진화 요약 (v0.5.0)** | ✅ |
+| **Phase 11-D** | **배경 데코 시스템 + AI 자연어 데코 생성 (v0.5.0)** | ✅ |
+| **GitScope → Pepper 리브랜딩** | **identifier · 데이터 디렉토리 자동 마이그레이션 (v0.5.0)** | ✅ |
+| **사용자 피드백 반영** | **hunk 단위 staging · 파일 다중 선택 · 사이드바 리사이저 · 날짜 포맷 토글 · `--all` 토글 · 행 여백 슬라이더 (v0.5.0)** | ✅ |
 | Phase 8-G-2 | 3-way side-by-side diff viewer (region 단위 해결) | 🔜 |
-| **Phase 11-A** | **`ThemeAiProvider` 추상화 + 수동 팔레트 편집기 + Anthropic BYOK + auditPalette 검증** | ✅ |
-| **커스텀 타이틀 바** | **`decorations: false` + WindowControls + 통합 RemoteSyncButton + 헤더 리디자인 (v0.4.0)** | ✅ |
-| Phase 11-B | Local Design Engine: llama.cpp sidecar + Gemma GGUF 기반 로컬 테마 생성 | 🔜 |
-| Phase 11-C | AI refine — 자연어 테마 수정 ("더 어둡게", "accent 파란색") | 🔜 |
+| Phase 11-B-2-c | 충돌 해결 AI 제안 (자동화 위험 검토 후) | 🔜 |
+| Phase 11-C | AI refine — 자연어 테마 수정 | 🔜 |
+| Phase 11-E | 봉고캣 영감 미니 플로팅 모드 (메인 ↔ 미니 토글) | 🔜 |
 | Phase 10 | Knowledge Graph + MCP (GitNexus 영감) | 🔜 |
+| Git 호스팅 연동 | GitHub/GitLab API (PR/Issue) | 🔜 |
 
 상세 계획과 이어받기 가이드는 [DEVELOPMENT.md](DEVELOPMENT.md) 참고.
 
 ### 브랜치
-- `master` — 메인 개발 브랜치 (Tauri)
+- `master` — 메인 개발 브랜치
 - `archive/express-version` — 이전 Express + Vite 웹앱 버전 (참조용 보존)
 
 ## 라이선스
