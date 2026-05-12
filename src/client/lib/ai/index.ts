@@ -32,8 +32,8 @@ const SELECTED_STORAGE = 'gitscope.themeAiProvider'
 export function getSelectedProviderId(): string {
   const saved = localStorage.getItem(SELECTED_STORAGE)
   if (saved && PROVIDERS.some(p => p.id === saved)) return saved
-  // 기본값: anthropic (BYOK 만 동작 가능한 현 시점). 11-B 이후 'local-llama'로 default 전환 검토.
-  return 'anthropic'
+  // 기본값: local-llama (Phase 11-B 활성화). 미설치 시 SettingsModal 이 다운로드 유도.
+  return 'local-llama'
 }
 
 export function setSelectedProviderId(id: string): void {

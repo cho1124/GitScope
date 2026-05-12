@@ -31,3 +31,10 @@ tree-sitter-typescript = "0.23"
 tree-sitter-rust = "0.24"
 tree-sitter-python = "0.25"
 tree-sitter-c-sharp = "0.23"
+
+# Local AI (Phase 11-B) — 모델/바이너리 다운로드 + sidecar 실행
+reqwest = { version = "0.12", default-features = false, features = ["rustls-tls", "stream", "json"] }
+tokio = { version = "1", features = ["fs", "rt-multi-thread", "macros", "process", "io-util"] }
+futures-util = { version = "0.3", default-features = false }
+sha2 = "0.10"
+zip = { version = "2", default-features = false, features = ["deflate"] }

@@ -132,6 +132,32 @@ export type ProgressEvent =
   | { stage: 'scanning'; current: number; total: number }
   | { stage: 'aggregating' }
 
+// Local AI 다운로드 진행 (Phase 11-B)
+export type DownloadProgress =
+  | { stage: 'started'; total: number }
+  | { stage: 'chunk'; downloaded: number; total: number }
+  | { stage: 'finished'; downloaded: number }
+  | { stage: 'failed'; message: string }
+
+export interface ModelStatus {
+  id: string
+  label: string
+  description: string
+  sizeBytes: number
+  license: string
+  licenseUrl: string
+  recommended: boolean
+  installed: boolean
+  localBytes: number
+}
+
+export interface AiStatus {
+  serverInstalled: boolean
+  runningPort: number | null
+  runningModel: string | null
+  models: ModelStatus[]
+}
+
 // ───── API ──────────────────────────────────────────────
 
 function mkProgressChannel(handler?: (e: ProgressEvent) => void): Channel<ProgressEvent> {
@@ -289,4 +315,29 @@ export const api = {
 
   getSymbolHistory: (filePath: string, startLine: number, endLine: number) =>
     call<CommitInfo[]>('get_symbol_history', { filePath, startLine, endLine }),
+
+  // ── Local AI (Phase 11-B) ────────────────────────────
+  aiStatus: () => call<AiStatus>('ai_status'),
+
+  aiDownloadModel: (modelId: string, onProgress?: (p: DownloadProgress) => void) =>
+    call<void>('ai_download_model', {
+      modelId,
+      onProgress: mkDownloadChannel(onProgress),
+    }),
+
+  aiDownloadServer: (onProgress?: (p: DownloadProgress) => void) =>
+    call<string>('ai_download_server', {
+      onProgress: mkDownloadChannel(onProgress),
+    }),
+
+  aiStartServer: (modelId: string) =>
+    call<number>('ai_start_server', { modelId }),
+
+  aiStopServer: () => call<void>('ai_stop_server'),
+}
+
+function mkDownloadChannel(handler?: (p: DownloadProgress) => void): Channel<DownloadProgress> {
+  const ch = new Channel<DownloadProgress>()
+  if (handler) ch.onmessage = handler
+  return ch
 }

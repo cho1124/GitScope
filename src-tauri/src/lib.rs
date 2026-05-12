@@ -1,3 +1,4 @@
+mod ai;
 mod forensics;
 mod git;
 mod recent;
@@ -7,12 +8,14 @@ mod symbols;
 use std::path::PathBuf;
 use std::sync::Mutex;
 
+use ai::AiServerHandle;
 use forensics::CachedScan;
 
 #[derive(Default)]
 pub struct AppState {
     pub repo: Mutex<Option<PathBuf>>,
     pub forensics_cache: Mutex<Option<CachedScan>>,
+    pub ai_server: Mutex<Option<AiServerHandle>>,
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -82,6 +85,11 @@ pub fn run() {
             stash::get_staged_diff,
             symbols::get_symbols,
             symbols::get_symbol_history,
+            ai::ai_status,
+            ai::ai_download_model,
+            ai::ai_download_server,
+            ai::ai_start_server,
+            ai::ai_stop_server,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

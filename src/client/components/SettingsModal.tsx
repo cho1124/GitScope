@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import {
   Settings as SettingsIcon, X, Check, Sparkles, Eye, EyeOff,
-  Trash2, Copy, Pencil, AlertTriangle, Cpu,
+  Trash2, Copy, Pencil, AlertTriangle,
 } from 'lucide-react'
 import {
   type Theme, type CustomTheme,
@@ -15,6 +15,7 @@ import {
   ANTHROPIC_MODEL_OPTIONS,
 } from '../lib/ai'
 import { ManualPaletteEditor } from './ManualPaletteEditor'
+import { LocalAiSettings } from './LocalAiSettings'
 import { useToast } from './Toast'
 import { useConfirm } from './ConfirmModal'
 import {
@@ -485,25 +486,9 @@ export function SettingsModal({ onClose }: Props) {
                 </>
               )}
 
-              {/* Local-llama: 안내만 */}
+              {/* Local-llama: 엔진/모델 다운로드 + 시작/종료 UI */}
               {providerId === 'local-llama' && (
-                <div style={{
-                  padding: 8,
-                  background: 'rgba(137, 180, 250, 0.06)',
-                  border: '1px solid var(--accent)',
-                  borderLeft: '3px solid var(--accent)',
-                  borderRadius: 'calc(var(--radius) - 2px)',
-                  fontSize: 11, color: 'var(--text-secondary)',
-                  display: 'flex', alignItems: 'flex-start', gap: 6,
-                }}>
-                  <Cpu size={12} color="var(--accent)" style={{ marginTop: 2, flexShrink: 0 }} />
-                  <div>
-                    <strong style={{ color: 'var(--accent)' }}>로컬 디자인 엔진</strong> — Phase 11-B 작업 예정.
-                    <div style={{ marginTop: 3, fontSize: 10, color: 'var(--text-muted)' }}>
-                      llama.cpp sidecar + Gemma GGUF 번들이 통합되면 키 없이 바로 사용 가능.
-                    </div>
-                  </div>
-                </div>
+                <LocalAiSettings onChanged={refreshAvailability} />
               )}
 
               {/* 프롬프트 */}
