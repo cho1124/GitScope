@@ -17,6 +17,11 @@ import {
 import { ManualPaletteEditor } from './ManualPaletteEditor'
 import { useToast } from './Toast'
 import { useConfirm } from './ConfirmModal'
+import {
+  useDateFormat, setDateFormat, type DateFormatMode,
+  useRowPaddingY, setRowPaddingY,
+  ROW_PADDING_MIN, ROW_PADDING_MAX, ROW_PADDING_DEFAULT,
+} from '../lib/displaySettings'
 
 interface Props {
   onClose: () => void
@@ -47,6 +52,8 @@ export function SettingsModal({ onClose }: Props) {
   const [theme, setTheme] = useState<Theme>(getSavedTheme())
   const [entered, setEntered] = useState(false)
   const [customThemes, setCustomThemes] = useState<CustomTheme[]>([])
+  const dateFormat = useDateFormat()
+  const rowPaddingY = useRowPaddingY()
 
   // provider 상태
   const providers = listProviders()
@@ -329,6 +336,54 @@ export function SettingsModal({ onClose }: Props) {
             >
               <Sparkles size={11} /> AI 생성기 {genOpen ? '닫기' : '열기'}
             </button>
+          </div>
+        </Section>
+
+        {/* 표시 옵션 */}
+        <Section title="표시">
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            <div>
+              <Label>커밋 날짜 표시</Label>
+              <select
+                value={dateFormat}
+                onChange={e => setDateFormat(e.target.value as DateFormatMode)}
+                style={{ width: '100%', fontSize: 11, padding: '4px 6px' }}
+              >
+                <option value="relative">상대 시간 (3일 전, 2주 전)</option>
+                <option value="absolute">절대 날짜 (2026-05-09 14:32)</option>
+              </select>
+            </div>
+
+            <div>
+              <Label>
+                커밋 행 세로 여백 — <span style={{ fontFamily: 'var(--font-mono)', color: 'var(--accent)' }}>{rowPaddingY}px</span>
+                {rowPaddingY !== ROW_PADDING_DEFAULT && (
+                  <button
+                    type="button"
+                    onClick={() => setRowPaddingY(ROW_PADDING_DEFAULT)}
+                    style={{
+                      marginLeft: 6,
+                      background: 'none', border: 'none',
+                      color: 'var(--text-muted)', cursor: 'pointer',
+                      fontSize: 10, padding: 0,
+                      textDecoration: 'underline',
+                    }}
+                  >
+                    초기화
+                  </button>
+                )}
+              </Label>
+              <input
+                type="range"
+                min={ROW_PADDING_MIN}
+                max={ROW_PADDING_MAX}
+                step={1}
+                value={rowPaddingY}
+                onChange={e => setRowPaddingY(parseInt(e.target.value, 10))}
+                style={{ width: '100%' }}
+              />
+              <Hint>커밋 리스트 한 행의 위/아래 여백. 그래프 라인 높이도 함께 늘어납니다.</Hint>
+            </div>
           </div>
         </Section>
 

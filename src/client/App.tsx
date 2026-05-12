@@ -36,6 +36,13 @@ export default function App() {
   const [refreshKey, setRefreshKey] = useState(0)
   const [loading, setLoading] = useState(false)
   const [settingsOpen, setSettingsOpen] = useState(false)
+  const [sidebarWidth, setSidebarWidth] = useState<number>(() => {
+    try {
+      const v = parseInt(localStorage.getItem('gitscope.sidebarWidth') ?? '260', 10)
+      return Number.isFinite(v) && v >= 180 && v <= 600 ? v : 260
+    } catch { return 260 }
+  })
+  const [resizing, setResizing] = useState(false)
 
   const handleOpenRepo = useCallback(async (path: string) => {
     const trimmed = path.trim()
@@ -77,6 +84,32 @@ export default function App() {
     setDiff('')
     setRefreshKey(k => k + 1)
   }, [])
+
+  const handleSidebarResizeStart = useCallback((e: React.MouseEvent) => {
+    e.preventDefault()
+    setResizing(true)
+    const startX = e.clientX
+    const startWidth = sidebarWidth
+    const onMove = (ev: MouseEvent) => {
+      const next = Math.max(180, Math.min(600, startWidth + (ev.clientX - startX)))
+      setSidebarWidth(next)
+    }
+    const onUp = () => {
+      document.removeEventListener('mousemove', onMove)
+      document.removeEventListener('mouseup', onUp)
+      document.body.style.cursor = ''
+      document.body.style.userSelect = ''
+      setResizing(false)
+    }
+    document.body.style.cursor = 'col-resize'
+    document.body.style.userSelect = 'none'
+    document.addEventListener('mousemove', onMove)
+    document.addEventListener('mouseup', onUp)
+  }, [sidebarWidth])
+
+  useEffect(() => {
+    try { localStorage.setItem('gitscope.sidebarWidth', String(sidebarWidth)) } catch {}
+  }, [sidebarWidth])
 
   // 키보드 단축키 (Ctrl+1~3 탭 전환, F5 새로고침)
   useEffect(() => {
@@ -147,7 +180,7 @@ export default function App() {
 
       <div className="app-body">
         {/* Sidebar */}
-        <div className="sidebar">
+        <div className="sidebar" style={{ width: sidebarWidth }}>
           <div className="sidebar-tabs">
             <button
               className={`sidebar-tab ${!showFileHistory ? 'active' : ''}`}
@@ -183,6 +216,16 @@ export default function App() {
             )}
           </div>
         </div>
+
+        {/* Resizer between sidebar and main content */}
+        <div
+          className={`sidebar-resizer${resizing ? ' dragging' : ''}`}
+          onMouseDown={handleSidebarResizeStart}
+          role="separator"
+          aria-orientation="vertical"
+          title="드래그하여 사이드바 너비 조정 · 더블클릭으로 기본값"
+          onDoubleClick={() => setSidebarWidth(260)}
+        />
 
         {/* Main Content */}
         <div className="main-content">

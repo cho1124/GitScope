@@ -2,12 +2,13 @@ import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { Tag, Cherry, AlertTriangle, Play, X as XIcon, RotateCcw, AlertOctagon, GitMerge, SkipForward } from 'lucide-react'
 import { api, type CommitInfo } from '../api'
 import { buildGraph, maxLaneCount } from '../lib/graph'
+import { useDateFormat, formatCommitDate, useRowPaddingY } from '../lib/displaySettings'
 import { CommitGraph } from './CommitGraph'
 import { useConfirm } from './ConfirmModal'
 import { useToast } from './Toast'
 import { InteractiveRebaseModal } from './InteractiveRebaseModal'
 
-const GRAPH_LINE_HEIGHT = 36
+const GRAPH_LINE_HEIGHT_BASE = 36
 const GRAPH_LANE_WIDTH = 14
 
 interface Props {
@@ -54,6 +55,7 @@ const pillStyle: React.CSSProperties = {
 }
 
 const PAGE_SIZE = 100
+const INCLUDE_ALL_LS_KEY = 'gitscope.commitLog.includeAll'
 
 interface CtxMenu {
   hash: string
@@ -238,6 +240,15 @@ export function CommitLog({ selectedCommit, onSelectCommit, file }: Props) {
   const [loading, setLoading] = useState(true)
   const [loadingMore, setLoadingMore] = useState(false)
   const [reachedEnd, setReachedEnd] = useState(false)
+  const [includeAll, setIncludeAll] = useState<boolean>(() => {
+    if (file) return false
+    try {
+      const v = localStorage.getItem(INCLUDE_ALL_LS_KEY)
+      return v === null ? true : v === 'true'
+    } catch {
+      return true
+    }
+  })
   const [ctxMenu, setCtxMenu] = useState<CtxMenu | null>(null)
   const [cherryInProgress, setCherryInProgress] = useState(false)
   const [rebaseInProgress, setRebaseInProgress] = useState(false)
@@ -248,27 +259,33 @@ export function CommitLog({ selectedCommit, onSelectCommit, file }: Props) {
   const confirm = useConfirm()
   const toast = useToast()
 
-  // 초기/파일 변경 시 로드
+  // 초기/파일 변경/토글 변경 시 로드
   useEffect(() => {
     setLoading(true)
     setReachedEnd(false)
-    api.getLog({ maxCount: PAGE_SIZE, file: file ?? undefined }).then(result => {
+    api.getLog({ maxCount: PAGE_SIZE, file: file ?? undefined, includeAll }).then(result => {
       if (result.ok) {
         setCommits(result.data)
         if (result.data.length < PAGE_SIZE) setReachedEnd(true)
       }
       setLoading(false)
     })
-  }, [file])
+  }, [file, includeAll])
+
+  // includeAll 변경 시 localStorage 저장 (파일 모드 제외)
+  useEffect(() => {
+    if (file) return
+    try { localStorage.setItem(INCLUDE_ALL_LS_KEY, String(includeAll)) } catch {}
+  }, [includeAll, file])
 
   const reload = useCallback(async () => {
     const target = Math.max(commits.length, PAGE_SIZE)
-    const result = await api.getLog({ maxCount: target, file: file ?? undefined })
+    const result = await api.getLog({ maxCount: target, file: file ?? undefined, includeAll })
     if (result.ok) {
       setCommits(result.data)
       setReachedEnd(result.data.length < target)
     }
-  }, [commits.length, file])
+  }, [commits.length, file, includeAll])
 
   const refreshCherryStatus = useCallback(async () => {
     const r = await api.cherryPickInProgress()
@@ -470,7 +487,8 @@ export function CommitLog({ selectedCommit, onSelectCommit, file }: Props) {
     setLoadingMore(true)
     const result = await api.getLog({
       maxCount: commits.length + PAGE_SIZE,
-      file: file ?? undefined
+      file: file ?? undefined,
+      includeAll,
     })
     setLoadingMore(false)
     if (result.ok) {
@@ -482,7 +500,7 @@ export function CommitLog({ selectedCommit, onSelectCommit, file }: Props) {
         if (next.length - commits.length < PAGE_SIZE) setReachedEnd(true)
       }
     }
-  }, [commits.length, file, loadingMore, reachedEnd])
+  }, [commits.length, file, loadingMore, reachedEnd, includeAll])
 
   // 키보드 네비 (↑/↓) — 리스트에 focus 된 상태에서
   useEffect(() => {
@@ -514,27 +532,54 @@ export function CommitLog({ selectedCommit, onSelectCommit, file }: Props) {
     if (el) el.scrollIntoView({ block: 'nearest' })
   }, [selectedCommit])
 
-  const formatDate = (dateStr: string) => {
-    const d = new Date(dateStr)
-    const now = new Date()
-    const diff = now.getTime() - d.getTime()
-    const days = Math.floor(diff / (1000 * 60 * 60 * 24))
-    if (days === 0) return '오늘'
-    if (days === 1) return '어제'
-    if (days < 7) return `${days}일 전`
-    if (days < 30) return `${Math.floor(days / 7)}주 전`
-    return d.toLocaleDateString('ko-KR', { year: 'numeric', month: 'short', day: 'numeric' })
-  }
+  const dateFormat = useDateFormat()
+  const rowPaddingY = useRowPaddingY()
+  const graphLineHeight = GRAPH_LINE_HEIGHT_BASE + rowPaddingY * 2
+  const formatDate = (dateStr: string) => formatCommitDate(dateStr, dateFormat)
 
   // 그래프 레인 계산
   const graphRows = useMemo(() => buildGraph(commits), [commits])
   const laneCount = useMemo(() => maxLaneCount(graphRows), [graphRows])
 
-  if (loading) return <div className="loading"><span className="spinner" /> 커밋 로딩 중...</div>
-  if (commits.length === 0) return <div className="loading">커밋이 없습니다</div>
+  const toolbar = !file && (
+    <div
+      style={{
+        display: 'flex',
+        alignItems: 'center',
+        gap: 8,
+        padding: '6px 12px',
+        borderBottom: '1px solid var(--border)',
+        background: 'var(--surface-1)',
+        fontSize: 12,
+        color: 'var(--text-secondary)',
+      }}
+    >
+      <label
+        style={{
+          display: 'inline-flex',
+          alignItems: 'center',
+          gap: 6,
+          cursor: 'pointer',
+          userSelect: 'none',
+        }}
+      >
+        <input
+          type="checkbox"
+          checked={includeAll}
+          onChange={e => setIncludeAll(e.target.checked)}
+          style={{ cursor: 'pointer' }}
+        />
+        <span>전체 브랜치 보기</span>
+      </label>
+    </div>
+  )
+
+  if (loading) return <>{toolbar}<div className="loading"><span className="spinner" /> 커밋 로딩 중...</div></>
+  if (commits.length === 0) return <>{toolbar}<div className="loading">커밋이 없습니다</div></>
 
   return (
     <>
+      {toolbar}
       {cherryInProgress && (
         <ProgressBanner
           label="Cherry-pick 진행 중. 충돌이 있으면 해결한 뒤 계속하세요."
@@ -592,7 +637,7 @@ export function CommitLog({ selectedCommit, onSelectCommit, file }: Props) {
                   commitHash={commit.hash}
                   laneCount={laneCount}
                   laneWidth={GRAPH_LANE_WIDTH}
-                  lineHeight={GRAPH_LINE_HEIGHT}
+                  lineHeight={graphLineHeight}
                 />
               )}
               <span className="commit-hash">{commit.hashShort}</span>
