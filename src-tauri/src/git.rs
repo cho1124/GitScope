@@ -368,9 +368,21 @@ pub fn apply_patch_cached(
 }
 
 #[tauri::command]
-pub fn commit(message: String, state: State<AppState>) -> Result<CommitResult, String> {
+pub fn commit(
+    message: String,
+    body: Option<String>,
+    state: State<AppState>,
+) -> Result<CommitResult, String> {
     with_repo(&state, |path| {
-        let out = run_git(path, &["commit", "-m", &message])?;
+        // body 가 있으면 git commit -m <subject> -m <body> 형식으로 깔끔히 분리.
+        // git 이 알아서 빈 줄 separator 삽입.
+        let mut args: Vec<&str> = vec!["commit", "-m", &message];
+        let body_trimmed = body.as_ref().map(|s| s.trim()).filter(|s| !s.is_empty());
+        if let Some(b) = body_trimmed {
+            args.push("-m");
+            args.push(b);
+        }
+        let out = run_git(path, &args)?;
         let hash = out
             .lines()
             .next()

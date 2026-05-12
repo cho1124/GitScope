@@ -35,6 +35,7 @@ export function CommitPanel({ onCommitDone }: Props) {
   const [diffLoading, setDiffLoading] = useState(false)
   const [genMsgBusy, setGenMsgBusy] = useState(false)
   const [genMsgHint, setGenMsgHint] = useState('')
+  const [body, setBody] = useState('')
 
   const loadStatus = useCallback(async () => {
     setLoading(true)
@@ -228,7 +229,9 @@ export function CommitPanel({ onCommitDone }: Props) {
         diff: diffRes.data,
         hint: genMsgHint.trim() || undefined,
       })
-      setMessage(result)
+      const { subject, body: aiBody } = splitCommitMessage(result)
+      setMessage(subject)
+      setBody(aiBody)
       toast.success(`커밋 메시지 생성 (${staged.length}개 파일 분석)`)
     } catch (e) {
       toast.error(`생성 실패: ${e instanceof Error ? e.message : String(e)}`)
@@ -237,13 +240,25 @@ export function CommitPanel({ onCommitDone }: Props) {
     }
   }
 
+  /** "subject\\n\\nbody..." 또는 "subject\\nbody" 를 두 부분으로 분리. */
+  function splitCommitMessage(msg: string): { subject: string; body: string } {
+    const lines = msg.split(/\r?\n/)
+    const subject = (lines[0] ?? '').trim()
+    let i = 1
+    while (i < lines.length && lines[i].trim() === '') i++
+    const body = lines.slice(i).join('\n').trimEnd()
+    return { subject, body }
+  }
+
   const handleCommit = async () => {
     if (!message.trim()) return
     setCommitting(true)
-    const result = await api.commit(message)
+    const result = await api.commit(message.trim(), body.trim() || undefined)
     setCommitting(false)
     if (result.ok) {
       setMessage('')
+      setBody('')
+      setGenMsgHint('')
       setSelection(EMPTY_SELECTION)
       onCommitDone()
       await loadStatus()
@@ -417,11 +432,29 @@ export function CommitPanel({ onCommitDone }: Props) {
                 )}
               </button>
             </div>
-            <textarea
+            <input
+              type="text"
               value={message}
               onChange={e => setMessage(e.target.value)}
-              placeholder="커밋 메시지..."
-              style={{ width: '100%', minHeight: '60px', marginBottom: '8px' }}
+              placeholder="제목 (subject) — 한 줄, 60자 이하 권장"
+              maxLength={120}
+              style={{
+                width: '100%',
+                fontSize: '12px',
+                padding: '6px 8px',
+                marginBottom: '4px',
+              }}
+            />
+            <textarea
+              value={body}
+              onChange={e => setBody(e.target.value)}
+              placeholder="설명 (description, 선택사항) — 왜 이 변경이 필요한지"
+              style={{
+                width: '100%',
+                minHeight: '60px',
+                marginBottom: '8px',
+                fontSize: '11px',
+              }}
             />
             <button
               className="btn btn-primary"

@@ -7,6 +7,15 @@ export default defineConfig({
   server: {
     port: 5173,
     strictPort: true,
+    watch: {
+      // Cargo target / .git / node_modules / dist 는 watch 에서 제외 — FSWatcher UNKNOWN error 방지
+      ignored: [
+        '**/src-tauri/target/**',
+        '**/.git/**',
+        '**/node_modules/**',
+        '**/dist/**',
+      ],
+    },
   },
   build: {
     outDir: 'dist/client',

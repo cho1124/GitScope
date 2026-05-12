@@ -292,7 +292,11 @@ export default function App() {
         </div>
       </div>
 
-      <StatusBar branch={repo.currentBranch} refreshKey={refreshKey} />
+      <StatusBar
+        branch={repo.currentBranch}
+        refreshKey={refreshKey}
+        onOpenSettings={() => setSettingsOpen(true)}
+      />
 
       {settingsOpen && <SettingsModal onClose={() => setSettingsOpen(false)} />}
     </div>

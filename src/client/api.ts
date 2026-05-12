@@ -188,7 +188,8 @@ export const api = {
   applyPatchCached: (patch: string, reverse?: boolean) =>
     call<void>('apply_patch_cached', { patch, reverse: reverse ?? false }),
 
-  commit: (message: string) => call<CommitResult>('commit', { message }),
+  commit: (message: string, body?: string) =>
+    call<CommitResult>('commit', { message, body: body ?? null }),
 
   getBranches: () => call<BranchInfo>('get_branches'),
 
