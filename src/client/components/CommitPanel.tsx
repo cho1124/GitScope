@@ -1,8 +1,10 @@
 import { useState, useEffect, useCallback } from 'react'
+import { Sparkles } from 'lucide-react'
 import { api, type StatusInfo } from '../api'
 import { DiffView } from './DiffView'
 import { useToast } from './Toast'
 import { StashAccordion } from './StashAccordion'
+import { getProvider, getSelectedProviderId } from '../lib/ai'
 
 interface Props {
   onCommitDone: () => void
@@ -31,6 +33,8 @@ export function CommitPanel({ onCommitDone }: Props) {
   const [selection, setSelection] = useState<Selection>(EMPTY_SELECTION)
   const [diff, setDiff] = useState<string>('')
   const [diffLoading, setDiffLoading] = useState(false)
+  const [genMsgBusy, setGenMsgBusy] = useState(false)
+  const [genMsgHint, setGenMsgHint] = useState('')
 
   const loadStatus = useCallback(async () => {
     setLoading(true)
@@ -200,6 +204,39 @@ export function CommitPanel({ onCommitDone }: Props) {
     }
   }, [reloadAfterPatch, toast])
 
+  const handleGenerateCommitMessage = async () => {
+    if (staged.length === 0) {
+      toast.error('staged 파일이 없습니다')
+      return
+    }
+    const provider = getProvider(getSelectedProviderId())
+    if (!provider?.generateCommitMessage) {
+      toast.error(`${provider?.label ?? '현재 provider'}는 커밋 메시지 생성을 지원하지 않습니다`)
+      return
+    }
+    const avail = await provider.isAvailable()
+    if (!avail.ok) {
+      toast.error(`${provider.label} 사용 불가: ${avail.reason}`)
+      return
+    }
+    setGenMsgBusy(true)
+    try {
+      const diffRes = await api.getStagedDiffAll()
+      if (!diffRes.ok) throw new Error(diffRes.error)
+      if (!diffRes.data.trim()) throw new Error('staged diff 가 비어있습니다')
+      const result = await provider.generateCommitMessage({
+        diff: diffRes.data,
+        hint: genMsgHint.trim() || undefined,
+      })
+      setMessage(result)
+      toast.success(`커밋 메시지 생성 (${staged.length}개 파일 분석)`)
+    } catch (e) {
+      toast.error(`생성 실패: ${e instanceof Error ? e.message : String(e)}`)
+    } finally {
+      setGenMsgBusy(false)
+    }
+  }
+
   const handleCommit = async () => {
     if (!message.trim()) return
     setCommitting(true)
@@ -340,6 +377,46 @@ export function CommitPanel({ onCommitDone }: Props) {
 
           {/* 커밋 영역 */}
           <div style={{ marginTop: 'auto' }}>
+            {/* AI 생성 toolbar */}
+            <div style={{
+              display: 'flex',
+              gap: 4,
+              alignItems: 'center',
+              marginBottom: 4,
+            }}>
+              <input
+                type="text"
+                value={genMsgHint}
+                onChange={e => setGenMsgHint(e.target.value)}
+                placeholder="힌트 (선택) — 예: 리팩토링, 버그 픽스…"
+                disabled={genMsgBusy}
+                style={{ flex: 1, fontSize: 10, padding: '3px 6px' }}
+              />
+              <button
+                type="button"
+                className="btn btn-sm"
+                onClick={handleGenerateCommitMessage}
+                disabled={genMsgBusy || staged.length === 0}
+                title="Staged diff 분석해서 AI 가 conventional commit 메시지 작성"
+                style={{
+                  fontSize: 10,
+                  padding: '3px 8px',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 4,
+                  background: 'var(--mauve)',
+                  color: 'var(--bg-primary)',
+                  borderColor: 'var(--mauve)',
+                  flexShrink: 0,
+                }}
+              >
+                {genMsgBusy ? (
+                  <><span className="spinner" style={{ width: 9, height: 9, borderWidth: 1 }} /> 생성중</>
+                ) : (
+                  <><Sparkles size={10} /> AI 생성</>
+                )}
+              </button>
+            </div>
             <textarea
               value={message}
               onChange={e => setMessage(e.target.value)}

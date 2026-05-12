@@ -190,6 +190,24 @@ pub fn get_symbol_history(
     })
 }
 
+/// 심볼 영역의 git log -L 결과 with patch — AI 요약용.
+/// 각 커밋의 메시지 + 그 심볼 영역에서 어떻게 변했는지 patch 형식으로.
+#[tauri::command]
+pub fn get_symbol_history_patch(
+    file_path: String,
+    start_line: u32,
+    end_line: u32,
+    state: State<AppState>,
+) -> Result<String, String> {
+    with_repo(&state, |path| {
+        let l_arg = format!("{},{}:{}", start_line, end_line, file_path);
+        run_git(
+            path,
+            &["log", "-L", &l_arg, "--no-color"],
+        )
+    })
+}
+
 fn parse_symbol_log(raw: &str) -> Vec<CommitInfo> {
     let mut commits = Vec::new();
     for chunk in raw.split("COMMIT_SEP").skip(1) {

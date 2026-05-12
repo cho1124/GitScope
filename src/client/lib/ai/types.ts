@@ -53,4 +53,29 @@ export interface ThemeAiProvider {
   refine?(opts: RefineOptions): Promise<ThemePalette>
   /** 자연어 → 배경 데코 설정 생성 (Phase 11-D-2) */
   generateDecor?(opts: GenerateOptions): Promise<import('../decorSettings').DecorConfig>
+  /** Staged diff → conventional commit 메시지 생성 (Phase 11-B-2) */
+  generateCommitMessage?(opts: CommitMessageOptions): Promise<string>
+  /** 심볼 단위 git log -L 결과 → 함수/클래스의 진화 요약 (Phase 11-B-2) */
+  summarizeSymbolHistory?(opts: SymbolHistoryOptions): Promise<string>
+}
+
+export interface CommitMessageOptions {
+  /** `git diff --cached` 전체 결과 */
+  diff: string
+  /** 사용자 힌트 (선택). 예: "리팩토링" / "버그 픽스" */
+  hint?: string
+  /** 언어 선호 — 기본 'auto' (모델이 diff 내용에 맞춰 결정) */
+  language?: 'auto' | 'ko' | 'en'
+}
+
+export interface SymbolHistoryOptions {
+  /** `git log -L <s>,<e>:<file>` 출력 (커밋 메타 + 심볼 영역 diff 들의 시리즈) */
+  logPatch: string
+  /** 심볼 이름 (UI 표시 + 프롬프트 컨텍스트) */
+  symbolName: string
+  /** 심볼 종류 (function/class/method 등) */
+  symbolKind?: string
+  /** 파일 경로 */
+  filePath: string
+  language?: 'auto' | 'ko' | 'en'
 }

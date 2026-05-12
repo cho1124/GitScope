@@ -308,6 +308,7 @@ export const api = {
   // ── Working tree diff ────────────────────────────────
   getUnstagedDiff: (file: string) => call<string>('get_unstaged_diff', { file }),
   getStagedDiff: (file: string) => call<string>('get_staged_diff', { file }),
+  getStagedDiffAll: () => call<string>('get_staged_diff_all'),
 
   // ── Symbols (Phase 9) ────────────────────────────────
   getSymbols: (filePath: string) =>
@@ -315,6 +316,9 @@ export const api = {
 
   getSymbolHistory: (filePath: string, startLine: number, endLine: number) =>
     call<CommitInfo[]>('get_symbol_history', { filePath, startLine, endLine }),
+
+  getSymbolHistoryPatch: (filePath: string, startLine: number, endLine: number) =>
+    call<string>('get_symbol_history_patch', { filePath, startLine, endLine }),
 
   // ── Local AI (Phase 11-B) ────────────────────────────
   aiStatus: () => call<AiStatus>('ai_status'),

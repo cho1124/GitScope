@@ -2,6 +2,7 @@ import { api } from '../../api'
 import {
   TOKEN_KEYS, type ThemeAiProvider, type ProviderAvailability,
   type GenerateOptions, type RefineOptions, type ThemePalette,
+  type CommitMessageOptions, type SymbolHistoryOptions,
 } from './types'
 import { validatePaletteShape, validateDecorShape } from './validation'
 import type { DecorConfig } from '../decorSettings'
@@ -90,6 +91,46 @@ GUIDELINES:
 - Default to "auto" color unless user mentions a specific color.
 - Keep opacity low (<=0.15) for non-intrusive backgrounds unless user says "vivid" or "bold".`
 
+const COMMIT_SYSTEM_PROMPT = `You are a Git commit message generator for Pepper, a Git GUI desktop app.
+Given a \`git diff --cached\` output, produce a single conventional commit message.
+
+FORMAT (strict):
+<type>(<scope>)?: <subject in 한국어, max 60 chars>
+
+<optional body — 2-4 lines explaining WHY/WHAT, bullets OK with "- " prefix>
+
+TYPES: feat (new feature) / fix (bug fix) / docs / style / refactor / perf / test / chore / build / ci
+
+GUIDELINES:
+- Subject in 한국어 unless diff is purely English (comments / English-only repo).
+- No trailing period in subject.
+- Use scope when one logical area is touched: feat(ui), fix(window), refactor(api), feat(ai), fix(commit-panel), etc.
+- Body explains WHY/WHAT changed (not HOW). Skip body for trivial changes.
+- If multiple unrelated changes: pick the most significant for subject, list others as body bullets.
+- If a USER HINT is provided, weight it heavily.
+
+Output ONLY the commit message text. No prose, no markdown fences, no quotes, no explanations.`
+
+const SYMBOL_SUMMARY_SYSTEM_PROMPT = `You are a code historian for Pepper, a Git GUI.
+Given the output of \`git log -L <range>:<file>\` for a single symbol (function / class / method), produce a concise narrative of how that symbol has evolved.
+
+OUTPUT FORMAT (한국어):
+**요약** (1-2 lines): the symbol's overall trajectory.
+
+**주요 변화** (3-6 bullets, oldest → newest):
+- <commit short hash> · <date or relative time> — <what changed and WHY, in one line>
+
+**현재 상태** (1-2 lines): what the symbol does now.
+
+GUIDELINES:
+- Write in 한국어. Use original commit subjects to ground each bullet, but rewrite them as natural-language descriptions.
+- Skip noise commits (formatting only, rename only) unless they're meaningful.
+- If a commit dramatically rewrote the symbol, call it out.
+- If the symbol was renamed / split / merged, describe it.
+- Don't quote diff lines verbatim — interpret them.
+
+Output ONLY the markdown text. No code fences. No prose around it.`
+
 interface ChatCompletionResponse {
   choices: Array<{
     message: { role: string; content: string }
@@ -141,6 +182,54 @@ async function callLocalRaw(port: number, system: string, user: string): Promise
 
 async function callLocal(port: number, system: string, user: string): Promise<ThemePalette> {
   return validatePaletteShape(await callLocalRaw(port, system, user))
+}
+
+/** JSON 강제 없이 plain text 응답. 커밋 메시지/요약/제안 등 자유 형식용. */
+async function callLocalText(
+  port: number,
+  system: string,
+  user: string,
+  maxTokens = 600,
+): Promise<string> {
+  const url = `http://127.0.0.1:${port}/v1/chat/completions`
+  const body = {
+    messages: [
+      { role: 'system', content: system },
+      { role: 'user', content: user },
+    ],
+    max_tokens: maxTokens,
+    temperature: 0.5,
+    stream: false,
+  }
+  let resp: Response
+  try {
+    resp = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    })
+  } catch (e) {
+    throw new Error(`로컬 서버 호출 실패 (port ${port}): ${e instanceof Error ? e.message : String(e)}`)
+  }
+  if (!resp.ok) {
+    const text = await resp.text().catch(() => '')
+    throw new Error(`HTTP ${resp.status}: ${text.slice(0, 200)}`)
+  }
+  const data = (await resp.json()) as ChatCompletionResponse
+  const content = data.choices?.[0]?.message?.content ?? ''
+  if (!content) throw new Error('빈 응답')
+  return content
+}
+
+/** 커밋 메시지에 자주 따라오는 마크다운/따옴표 래퍼 제거. */
+function cleanCommitMessage(s: string): string {
+  let out = s.trim()
+  const fenced = out.match(/^```(?:[a-z]*\n)?([\s\S]*?)```$/)
+  if (fenced) out = fenced[1].trim()
+  if ((out.startsWith('"') && out.endsWith('"')) || (out.startsWith("'") && out.endsWith("'"))) {
+    out = out.slice(1, -1).trim()
+  }
+  return out
 }
 
 function extractJsonBlock(text: string): string {
@@ -200,5 +289,60 @@ export class LocalLlamaThemeProvider implements ThemeAiProvider {
     const modelId = getSelectedLocalModel()
     const port = await ensureServer(modelId)
     return validateDecorShape(await callLocalRaw(port, DECOR_SYSTEM_PROMPT, prompt))
+  }
+
+  async summarizeSymbolHistory({
+    logPatch, symbolName, symbolKind, filePath, language,
+  }: SymbolHistoryOptions): Promise<string> {
+    if (!logPatch || !logPatch.trim()) throw new Error('히스토리가 비어있습니다')
+    const MAX_CHARS = 24000
+    let trimmed = logPatch
+    let truncated = false
+    if (logPatch.length > MAX_CHARS) {
+      // 최신 커밋들을 우선 보존하기 위해 머리쪽 잘림 (git log 는 newest first 로 시작)
+      trimmed = logPatch.slice(0, MAX_CHARS)
+      truncated = true
+    }
+    const langHint =
+      language === 'ko' ? '\n응답 언어: 한국어'
+      : language === 'en' ? '\nResponse language: English'
+      : ''
+    const truncNote = truncated ? `\n(NOTE: log truncated to ${MAX_CHARS} chars — older commits omitted)` : ''
+    const kindStr = symbolKind ? ` (${symbolKind})` : ''
+    const user = `SYMBOL: ${symbolName}${kindStr}
+FILE: ${filePath}
+${truncNote}
+
+LOG WITH PATCH:
+\`\`\`
+${trimmed}
+\`\`\`${langHint}`
+
+    const modelId = getSelectedLocalModel()
+    const port = await ensureServer(modelId)
+    return (await callLocalText(port, SYMBOL_SUMMARY_SYSTEM_PROMPT, user, 800)).trim()
+  }
+
+  async generateCommitMessage({ diff, hint, language }: CommitMessageOptions): Promise<string> {
+    if (!diff || !diff.trim()) throw new Error('staged 변경이 없습니다')
+    const MAX_CHARS = 24000 // ~8K tokens (Qwen2.5 ctx 8192 안전 마진)
+    let trimmed = diff
+    let truncated = false
+    if (diff.length > MAX_CHARS) {
+      trimmed = diff.slice(0, MAX_CHARS)
+      truncated = true
+    }
+    const langHint =
+      language === 'ko' ? '\n응답 언어: 한국어'
+      : language === 'en' ? '\nResponse language: English'
+      : ''
+    const hintLine = hint?.trim() ? `\nUSER HINT: ${hint.trim()}` : ''
+    const truncNote = truncated ? `\n(NOTE: diff truncated to ${MAX_CHARS} chars due to context limit)` : ''
+    const user = `STAGED DIFF:${truncNote}\n\`\`\`diff\n${trimmed}\n\`\`\`${hintLine}${langHint}`
+
+    const modelId = getSelectedLocalModel()
+    const port = await ensureServer(modelId)
+    const raw = await callLocalText(port, COMMIT_SYSTEM_PROMPT, user, 600)
+    return cleanCommitMessage(raw)
   }
 }

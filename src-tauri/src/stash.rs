@@ -125,3 +125,11 @@ pub fn get_staged_diff(file: String, state: State<AppState>) -> Result<String, S
         run_git(path, &["diff", "--cached", "--", &file])
     })
 }
+
+/// 모든 staged 파일의 합쳐진 diff. AI 커밋 메시지 생성용.
+#[tauri::command]
+pub fn get_staged_diff_all(state: State<AppState>) -> Result<String, String> {
+    with_repo(&state, |path| {
+        run_git(path, &["diff", "--cached"])
+    })
+}

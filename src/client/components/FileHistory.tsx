@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react'
-import { Info } from 'lucide-react'
+import { Info, Sparkles, X as XIcon } from 'lucide-react'
 import { api, type CommitInfo, type Symbol } from '../api'
+import { useToast } from './Toast'
+import { getProvider, getSelectedProviderId } from '../lib/ai'
 
 // 옵션 B (2026-04-29): 파일 전체 로그는 우측 커밋 로그 탭에서 보고,
 // 좌측은 심볼 단위 히스토리 전용으로 재정의.
@@ -28,11 +30,15 @@ const KIND_COLORS: Record<string, string> = {
 }
 
 export function FileHistory({ filePath, selectedCommit, onSelectCommit }: Props) {
+  const toast = useToast()
   const [commits, setCommits] = useState<CommitInfo[]>([])
   const [loading, setLoading] = useState(true)
   const [symbols, setSymbols] = useState<Symbol[]>([])
   // -1 = 전체 파일
   const [selectedSymbolIdx, setSelectedSymbolIdx] = useState<number>(-1)
+  // AI 요약 상태 (Phase 11-B-2-b)
+  const [aiSummary, setAiSummary] = useState<string | null>(null)
+  const [summaryBusy, setSummaryBusy] = useState(false)
 
   // 심볼 로드 (파일 바뀔 때만)
   useEffect(() => {
@@ -45,6 +51,7 @@ export function FileHistory({ filePath, selectedCommit, onSelectCommit }: Props)
 
   // 심볼 선택 시에만 히스토리 로드 (파일 전체 로그는 우측 커밋 로그 탭에서)
   useEffect(() => {
+    setAiSummary(null) // 심볼 바뀌면 이전 요약 폐기
     if (selectedSymbolIdx === -1) {
       setCommits([])
       setLoading(false)
@@ -62,6 +69,39 @@ export function FileHistory({ filePath, selectedCommit, onSelectCommit }: Props)
       setLoading(false)
     })
   }, [filePath, selectedSymbolIdx, symbols])
+
+  const handleSummarize = async () => {
+    const sym = selectedSymbolIdx >= 0 ? symbols[selectedSymbolIdx] : null
+    if (!sym) return
+    const provider = getProvider(getSelectedProviderId())
+    if (!provider?.summarizeSymbolHistory) {
+      toast.error(`${provider?.label ?? '현재 provider'}는 심볼 요약을 지원하지 않습니다`)
+      return
+    }
+    const avail = await provider.isAvailable()
+    if (!avail.ok) {
+      toast.error(`${provider.label} 사용 불가: ${avail.reason}`)
+      return
+    }
+    setSummaryBusy(true)
+    try {
+      const r = await api.getSymbolHistoryPatch(filePath, sym.startLine, sym.endLine)
+      if (!r.ok) throw new Error(r.error)
+      if (!r.data.trim()) throw new Error('이 심볼의 변경 히스토리가 없습니다')
+      const result = await provider.summarizeSymbolHistory({
+        logPatch: r.data,
+        symbolName: sym.name,
+        symbolKind: sym.kind,
+        filePath,
+      })
+      setAiSummary(result)
+      toast.success(`${sym.name} 진화 요약 생성됨`)
+    } catch (e) {
+      toast.error(`요약 실패: ${e instanceof Error ? e.message : String(e)}`)
+    } finally {
+      setSummaryBusy(false)
+    }
+  }
 
   const formatDate = (dateStr: string) => {
     const d = new Date(dateStr)
@@ -192,9 +232,64 @@ export function FileHistory({ filePath, selectedCommit, onSelectCommit }: Props)
         </div>
       ) : (
         <>
-          <div style={{ fontSize: '11px', color: 'var(--text-muted)', padding: '8px 12px' }}>
-            총 {commits.length}개 커밋 (심볼 단위)
+          <div style={{
+            display: 'flex', alignItems: 'center', gap: 6,
+            padding: '8px 12px',
+            fontSize: '11px', color: 'var(--text-muted)',
+          }}>
+            <span style={{ flex: 1 }}>총 {commits.length}개 커밋 (심볼 단위)</span>
+            {commits.length > 0 && (
+              <button
+                type="button"
+                className="btn btn-sm"
+                onClick={handleSummarize}
+                disabled={summaryBusy}
+                title="이 심볼의 진화 과정을 AI 가 자연어로 요약"
+                style={{
+                  fontSize: 10, padding: '3px 8px',
+                  display: 'inline-flex', alignItems: 'center', gap: 4,
+                  background: 'var(--mauve)', color: 'var(--bg-primary)', borderColor: 'var(--mauve)',
+                }}
+              >
+                {summaryBusy ? (
+                  <><span className="spinner" style={{ width: 9, height: 9, borderWidth: 1 }} /> 요약중</>
+                ) : (
+                  <><Sparkles size={10} /> AI 요약</>
+                )}
+              </button>
+            )}
           </div>
+
+          {aiSummary && (
+            <div style={{
+              margin: '0 12px 8px',
+              padding: '10px 12px',
+              background: 'rgba(203, 166, 247, 0.06)',
+              border: '1px solid var(--mauve)',
+              borderLeft: '3px solid var(--mauve)',
+              borderRadius: 'calc(var(--radius) - 2px)',
+              fontSize: 11,
+              color: 'var(--text-primary)',
+              whiteSpace: 'pre-wrap',
+              lineHeight: 1.55,
+              position: 'relative',
+            }}>
+              <button
+                type="button"
+                onClick={() => setAiSummary(null)}
+                aria-label="요약 닫기"
+                title="닫기"
+                style={{
+                  position: 'absolute', top: 4, right: 4,
+                  background: 'none', border: 'none', cursor: 'pointer',
+                  color: 'var(--text-muted)', padding: 2, display: 'flex',
+                }}
+              >
+                <XIcon size={11} />
+              </button>
+              <div style={{ paddingRight: 16 }}>{aiSummary}</div>
+            </div>
+          )}
           {commits.map((commit, i) => {
             const isSelected = selectedCommit === commit.hash
             return (
