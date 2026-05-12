@@ -2,7 +2,52 @@
 
 > 작업 이어받기용 문서. 다른 PC/세션에서 이어받을 때 이 파일만 읽어도 컨텍스트 복원됨.
 
-## 현재 상태 (2026-04-29 기준)
+---
+
+## 🌶️ v0.5.0 핸드오프 (2026-05-12)
+
+### 한 줄 요약
+**GitScope → Pepper 리브랜딩 완료** + 내장 AI (llama.cpp sidecar + Qwen2.5 Coder GGUF) + AI 차별화 (커밋 메시지 자동 생성 / 심볼 진화 narrative 요약) + 배경 데코 (자연어 → 36개 아이콘 풀). 사용자 피드백 10건 중 7건 반영.
+
+### 작업 중
+없음 — `master` 클린, `v0.5.0` 태그 푸시됨.
+
+### 다음 후보 (우선순위)
+1. **🐱 Phase 11-E 봉고캣 미니 모드** (영준님 픽, 강추) — 봉고캣 영감 받은 작은 항상 떠있는 위젯. 빠른 커밋 + 입력 반응. 다른 git GUI 어디에도 없는 차별점. 자세한 설계: `~/.claude/projects/.../memory/project_pepper_bongocat_idea.md`
+2. **#1 Git 호스팅 연동** — GitHub/GitLab API (PR / Issue 조회). 큰 작업 단위
+3. **Phase 11-B-2-c 충돌 해결 제안** — 보류 (자동화 위험 검토 필요)
+
+### 마지막 릴리즈 작업 (영준님 직접)
+```powershell
+cd C:/Users/WINTEK/Desktop/Personal/GitScope
+npm run build   # production NSIS + MSI 생성, 5~10분
+gh release create v0.5.0 `
+  --title "Pepper v0.5.0 — 내장 AI + 리브랜딩" `
+  --notes-file CHANGELOG.md `
+  "src-tauri/target/release/bundle/nsis/Pepper_0.5.0_x64-setup.exe" `
+  "src-tauri/target/release/bundle/msi/Pepper_0.5.0_x64_en-US.msi"
+```
+
+### 즉시 검증 가능한 사용자 흐름
+1. `npm run dev` → 윈도우 뜸 (첫 부팅 시 `gitscope/` → `pepper/` 자동 마이그레이션)
+2. **AI 워밍업**: StatusBar 우측 `AI off` 칩 클릭 → 시작 (30초 워밍업 후 `AI · :PORT` 표시)
+3. **AI 커밋 메시지**: 변경사항 탭 → 파일 stage → 힌트 입력 (선택) → `✨ AI 생성` → subject/body 자동 분리
+4. **AI 심볼 요약**: 좌측 심볼 히스토리 탭 → 심볼 선택 → `✨ AI 요약`
+5. **AI 테마 생성**: 설정창 → AI 생성기 → 자연어 → 14 토큰 팔레트
+6. **AI 배경 데코**: 설정창 → 배경 데코 → "고양이가 떠다니는" → customIcons 자동 매핑
+
+### 새 기술 결정 (v0.5.0)
+- **llama.cpp sidecar**: ggml-org/llama.cpp latest release 자동 다운로드 + zip 해제. CPU 빌드만 사용 (CUDA/Vulkan 분기는 향후). 포트 27182부터 가용 포트 자동 선택. `kill_on_drop=true` 로 메인 프로세스 종료 시 정리.
+- **Qwen 2.5 Coder 3B (Q4_K_M)**: ~2GB. 코딩 컨텍스트 이해 + JSON 출력 + 한국어 OK. Phi-4-mini / Gemma3 보다 코딩 특화로 선택.
+- **추론 호출**: 프론트에서 `localhost:port/v1/chat/completions` 직접 fetch (OpenAI compatible). Rust 는 라이프사이클만 관리.
+- **AI Provider 추상화**: `ThemeAiProvider` 인터페이스에 generate / refine / generateDecor / generateCommitMessage / summarizeSymbolHistory 메서드 (모두 optional). 로컬과 Anthropic BYOK 둘 다 지원 가능한 구조 (현재 로컬만 5개 메서드 다 구현).
+
+### Vite Watcher 함정 (2026-05-12)
+`vite.config.ts`의 `server.watch.ignored` 에 `**/src-tauri/target/**` 추가 필수. Cargo 빌드 산출물(수천 파일)이 watch 되면 Node24 + Windows에서 `FSWatcher UNKNOWN error` 로 vite 가 죽음 (beforeDevCommand 종료 → tauri dev 도 같이 종료). 영준님 메모리에 적혀있던 "tauri dev 백그라운드 불안정" 의 진짜 원인이 이거였음.
+
+---
+
+## 이전 기록 (2026-04-29 기준, v0.2.0 시점)
 
 **Phase 0~7 + Phase 9-A/B/C/D + Phase 8-A~F + 8-G-1 완료.** 다음 릴리즈 후보: **v0.3.0** (8-G-2 또는 UX 폴리시 후).
 
