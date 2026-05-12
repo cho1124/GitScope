@@ -207,6 +207,7 @@ pub fn open_repo(path: String, state: State<AppState>) -> Result<RepoInfo, Strin
 pub fn get_log(
     max_count: Option<u32>,
     file: Option<String>,
+    include_all: Option<bool>,
     state: State<AppState>,
 ) -> Result<Vec<CommitInfo>, String> {
     with_repo(&state, |path| {
@@ -217,6 +218,10 @@ pub fn get_log(
             &max_arg,
             "--pretty=format:%H\x1f%h\x1f%s\x1f%an\x1f%ae\x1f%aI\x1f%D\x1f%P",
         ];
+        // --all 은 --follow(파일 히스토리)와 호환 안 됨 → 파일 모드에선 무시
+        if include_all.unwrap_or(false) && file.is_none() {
+            args.push("--all");
+        }
         let file_ref;
         if let Some(f) = &file {
             args.push("--follow");
@@ -305,6 +310,59 @@ pub fn stage(files: Vec<String>, state: State<AppState>) -> Result<(), String> {
             args.push(f.as_str());
         }
         run_git(path, &args)?;
+        Ok(())
+    })
+}
+
+#[tauri::command]
+pub fn unstage(files: Vec<String>, state: State<AppState>) -> Result<(), String> {
+    with_repo(&state, |path| {
+        let mut args: Vec<&str> = vec!["reset", "HEAD", "--"];
+        for f in &files {
+            args.push(f.as_str());
+        }
+        run_git(path, &args)?;
+        Ok(())
+    })
+}
+
+/// 부분 staging — hunk 단위 패치를 stdin으로 git apply --cached 에 전달.
+/// `reverse=true` 면 staged → unstaged 로 되돌림 (--reverse).
+#[tauri::command]
+pub fn apply_patch_cached(
+    patch: String,
+    reverse: Option<bool>,
+    state: State<AppState>,
+) -> Result<(), String> {
+    use std::io::Write;
+    use std::process::Stdio;
+    with_repo(&state, |path| {
+        let mut cmd = Command::new("git");
+        cmd.arg("-C").arg(path);
+        cmd.args(["apply", "--cached", "--whitespace=nowarn"]);
+        if reverse.unwrap_or(false) {
+            cmd.arg("--reverse");
+        }
+        cmd.arg("-");
+        cmd.stdin(Stdio::piped());
+        cmd.stdout(Stdio::piped());
+        cmd.stderr(Stdio::piped());
+
+        #[cfg(target_os = "windows")]
+        cmd.creation_flags(CREATE_NO_WINDOW);
+
+        let mut child = cmd.spawn().map_err(|e| format!("git 실행 실패: {}", e))?;
+        if let Some(mut stdin) = child.stdin.take() {
+            stdin
+                .write_all(patch.as_bytes())
+                .map_err(|e| format!("패치 stdin write 실패: {}", e))?;
+        }
+        let output = child
+            .wait_with_output()
+            .map_err(|e| format!("git apply 종료 실패: {}", e))?;
+        if !output.status.success() {
+            return Err(String::from_utf8_lossy(&output.stderr).trim().to_string());
+        }
         Ok(())
     })
 }

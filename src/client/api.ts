@@ -143,10 +143,11 @@ function mkProgressChannel(handler?: (e: ProgressEvent) => void): Channel<Progre
 export const api = {
   openRepo: (path: string) => call<RepoInfo>('open_repo', { path }),
 
-  getLog: (opts?: { maxCount?: number; file?: string }) =>
+  getLog: (opts?: { maxCount?: number; file?: string; includeAll?: boolean }) =>
     call<CommitInfo[]>('get_log', {
       maxCount: opts?.maxCount ?? 200,
       file: opts?.file ?? null,
+      includeAll: opts?.includeAll ?? false,
     }),
 
   getStatus: () => call<StatusInfo>('get_status'),
@@ -154,6 +155,12 @@ export const api = {
   getDiff: (hash: string) => call<string>('get_diff', { hash }),
 
   stage: (files: string[]) => call<void>('stage', { files }),
+
+  unstage: (files: string[]) => call<void>('unstage', { files }),
+
+  /** 부분 staging — hunk 단위 patch 를 stdin 으로 git apply --cached 에 전달. */
+  applyPatchCached: (patch: string, reverse?: boolean) =>
+    call<void>('apply_patch_cached', { patch, reverse: reverse ?? false }),
 
   commit: (message: string) => call<CommitResult>('commit', { message }),
 

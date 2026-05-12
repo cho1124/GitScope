@@ -36,6 +36,8 @@ pub fn run() {
             git::get_status,
             git::get_diff,
             git::stage,
+            git::unstage,
+            git::apply_patch_cached,
             git::commit,
             git::get_branches,
             git::checkout,
