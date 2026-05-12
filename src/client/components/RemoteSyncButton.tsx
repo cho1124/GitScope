@@ -83,6 +83,8 @@ export function RemoteSyncButton({ refreshKey, onSynced }: Props) {
   // 표시 상태 결정
   const view = computeView(status)
 
+  const showCounts = !!status?.hasUpstream
+
   return (
     <div ref={containerRef} style={{ position: 'relative', display: 'inline-flex' }}>
       <button
@@ -94,9 +96,10 @@ export function RemoteSyncButton({ refreshKey, onSynced }: Props) {
         style={{
           display: 'inline-flex',
           alignItems: 'center',
-          gap: 6,
-          padding: '6px 10px',
-          fontSize: 12,
+          gap: 7,
+          padding: '8px 14px',
+          fontSize: 13,
+          fontWeight: 500,
           color: view.color,
           borderRight: 'none',
           borderTopRightRadius: 0,
@@ -104,11 +107,17 @@ export function RemoteSyncButton({ refreshKey, onSynced }: Props) {
         }}
       >
         {busy ? (
-          <span className="spinner" style={{ width: 12, height: 12, borderWidth: 1.5 }} />
+          <span className="spinner" style={{ width: 14, height: 14, borderWidth: 1.5 }} />
         ) : (
           view.icon
         )}
         <span>{view.label}</span>
+        {showCounts && status && (
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, marginLeft: 4 }}>
+            <CountPill value={status.ahead} arrow="↑" color="var(--accent)" />
+            <CountPill value={status.behind} arrow="↓" color="var(--peach)" />
+          </span>
+        )}
       </button>
       <button
         className="btn btn-sm"
@@ -117,13 +126,13 @@ export function RemoteSyncButton({ refreshKey, onSynced }: Props) {
         aria-label="동기화 옵션"
         title="다른 동작 선택"
         style={{
-          padding: '6px 4px',
+          padding: '8px 8px',
           borderTopLeftRadius: 0,
           borderBottomLeftRadius: 0,
           marginLeft: -1,
         }}
       >
-        <ChevronDown size={11} />
+        <ChevronDown size={14} />
       </button>
 
       {menuOpen && status?.hasUpstream && (
@@ -133,49 +142,49 @@ export function RemoteSyncButton({ refreshKey, onSynced }: Props) {
             position: 'absolute',
             top: 'calc(100% + 4px)',
             right: 0,
-            minWidth: 200,
+            minWidth: 260,
             background: 'var(--bg-secondary)',
             border: '1px solid var(--border)',
             borderRadius: 'var(--radius)',
-            boxShadow: '0 4px 16px rgba(0,0,0,0.4)',
+            boxShadow: '0 6px 20px rgba(0,0,0,0.45)',
             zIndex: 100,
-            padding: 4,
+            padding: 6,
           }}
         >
           <div
             style={{
-              fontSize: 10,
+              fontSize: 11,
               color: 'var(--text-muted)',
-              padding: '4px 8px',
+              padding: '6px 10px',
               fontFamily: 'var(--font-mono)',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 6,
+              flexWrap: 'wrap',
             }}
           >
-            {status.upstream}
-            {' · '}
-            <span style={{ color: status.ahead > 0 ? 'var(--accent)' : 'var(--text-muted)' }}>
-              {status.ahead}↑
+            <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1, minWidth: 0 }}>
+              {status.upstream}
             </span>
-            {' '}
-            <span style={{ color: status.behind > 0 ? 'var(--peach)' : 'var(--text-muted)' }}>
-              {status.behind}↓
-            </span>
+            <CountPill value={status.ahead} arrow="↑" color="var(--accent)" />
+            <CountPill value={status.behind} arrow="↓" color="var(--peach)" />
           </div>
-          <div style={{ height: 1, background: 'var(--border)', margin: '2px 0' }} />
+          <div style={{ height: 1, background: 'var(--border)', margin: '4px 0' }} />
           <MenuItem
-            icon={<RefreshCw size={12} />}
+            icon={<RefreshCw size={13} />}
             label="Fetch (--all --prune)"
             onClick={() => runAction('fetch')}
             highlight={view.primary === 'fetch'}
           />
           <MenuItem
-            icon={<ArrowDownToLine size={12} />}
+            icon={<ArrowDownToLine size={13} />}
             label={`Pull${status.behind > 0 ? ` (${status.behind})` : ''}`}
             onClick={() => runAction('pull')}
             highlight={view.primary === 'pull'}
             disabled={status.behind === 0}
           />
           <MenuItem
-            icon={<ArrowUpFromLine size={12} />}
+            icon={<ArrowUpFromLine size={13} />}
             label={`Push${status.ahead > 0 ? ` (${status.ahead})` : ''}`}
             onClick={() => runAction('push')}
             highlight={view.primary === 'push'}
@@ -184,6 +193,33 @@ export function RemoteSyncButton({ refreshKey, onSynced }: Props) {
         </div>
       )}
     </div>
+  )
+}
+
+function CountPill({ value, arrow, color }: { value: number; arrow: '↑' | '↓'; color: string }) {
+  const active = value > 0
+  return (
+    <span
+      style={{
+        display: 'inline-flex',
+        alignItems: 'center',
+        gap: 1,
+        fontSize: 11,
+        fontFamily: 'var(--font-mono)',
+        fontWeight: 600,
+        padding: '1px 6px',
+        borderRadius: 10,
+        background: active ? color : 'transparent',
+        color: active ? 'var(--bg-primary)' : 'var(--text-muted)',
+        border: active ? 'none' : '1px solid var(--border)',
+        minWidth: 22,
+        justifyContent: 'center',
+        lineHeight: 1.3,
+      }}
+      aria-label={`${value} ${arrow === '↑' ? 'ahead' : 'behind'}`}
+    >
+      {value}{arrow}
+    </span>
   )
 }
 
@@ -224,17 +260,17 @@ function computeView(status: RemoteStatus | null): ViewState {
   if (ahead === 0 && behind === 0) {
     return {
       primary: 'fetch',
-      icon: <RefreshCw size={13} />,
+      icon: <Check size={15} color="var(--green)" strokeWidth={2.5} />,
       label: 'Sync',
       title: `${status.upstream} 와 동기화됨 — 클릭 시 fetch`,
-      color: 'var(--text-primary)',
+      color: 'var(--green)',
     }
   }
   if (ahead > 0 && behind === 0) {
     return {
       primary: 'push',
-      icon: <ArrowUpFromLine size={13} color="var(--accent)" />,
-      label: `Push (${ahead})`,
+      icon: <ArrowUpFromLine size={15} color="var(--accent)" />,
+      label: 'Push',
       title: `로컬에만 ${ahead}개 커밋 — 클릭 시 push`,
       color: 'var(--accent)',
     }
@@ -242,8 +278,8 @@ function computeView(status: RemoteStatus | null): ViewState {
   if (ahead === 0 && behind > 0) {
     return {
       primary: 'pull',
-      icon: <ArrowDownToLine size={13} color="var(--peach)" />,
-      label: `Pull (${behind})`,
+      icon: <ArrowDownToLine size={15} color="var(--peach)" />,
+      label: 'Pull',
       title: `원격에만 ${behind}개 커밋 — 클릭 시 pull`,
       color: 'var(--peach)',
     }
@@ -251,9 +287,9 @@ function computeView(status: RemoteStatus | null): ViewState {
   // diverged
   return {
     primary: 'fetch',
-    icon: <AlertTriangle size={13} color="var(--yellow)" />,
-    label: `Diverged (${ahead}↑ ${behind}↓)`,
-    title: `히스토리 분기 — 클릭 시 fetch (pull/push는 직접 판단 필요)`,
+    icon: <AlertTriangle size={15} color="var(--yellow)" />,
+    label: 'Diverged',
+    title: `히스토리 분기 (${ahead}↑ ${behind}↓) — 클릭 시 fetch (pull/push는 직접 판단 필요)`,
     color: 'var(--yellow)',
   }
 }
@@ -279,14 +315,14 @@ function MenuItem({
       style={{
         display: 'flex',
         alignItems: 'center',
-        gap: 8,
+        gap: 10,
         width: '100%',
-        padding: '6px 10px',
+        padding: '8px 12px',
         background: 'transparent',
         border: 'none',
         borderRadius: 4,
         color: disabled ? 'var(--text-muted)' : 'var(--text-primary)',
-        fontSize: 12,
+        fontSize: 13,
         cursor: disabled ? 'not-allowed' : 'pointer',
         textAlign: 'left',
         opacity: disabled ? 0.5 : 1,
