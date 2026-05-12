@@ -66,7 +66,7 @@ pub async fn download_server(on_progress: &Channel<DownloadProgress>) -> Result<
 
     // 1) latest release 메타데이터
     let client = reqwest::Client::builder()
-        .user_agent("GitScope/0.4 (+https://github.com/cho1124/GitScope)")
+        .user_agent("Pepper/0.4 (+https://github.com/cho1124/Pepper)")
         .build()
         .map_err(|e| format!("HTTP 클라이언트 생성 실패: {}", e))?;
 

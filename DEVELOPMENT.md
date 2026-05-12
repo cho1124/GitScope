@@ -1,4 +1,4 @@
-# GitScope — Development Handoff
+# Pepper — Development Handoff
 
 > 작업 이어받기용 문서. 다른 PC/세션에서 이어받을 때 이 파일만 읽어도 컨텍스트 복원됨.
 
@@ -51,8 +51,8 @@ rustup 설치 후 PowerShell/터미널 재시작하면 `rustc --version`, `cargo
 
 ### 레포 클론 + 실행
 ```bash
-git clone https://github.com/cho1124/GitScope.git
-cd GitScope
+git clone https://github.com/cho1124/Pepper.git
+cd Pepper
 npm install
 npm run dev
 ```
@@ -65,17 +65,17 @@ npm run build
 ```
 산출물:
 - `src-tauri/target/release/app.exe` (단일 실행 파일)
-- `src-tauri/target/release/bundle/nsis/GitScope_X.Y.Z_x64-setup.exe` (NSIS 설치)
-- `src-tauri/target/release/bundle/msi/GitScope_X.Y.Z_x64_en-US.msi` (MSI 설치)
+- `src-tauri/target/release/bundle/nsis/Pepper_X.Y.Z_x64-setup.exe` (NSIS 설치)
+- `src-tauri/target/release/bundle/msi/Pepper_X.Y.Z_x64_en-US.msi` (MSI 설치)
 
 릴리즈 빌드는 LTO 최적화로 **5-10분** 소요.
 
 ### GitHub Release 업로드
 ```bash
 gh release create vX.Y.Z \
-  "src-tauri/target/release/bundle/nsis/GitScope_X.Y.Z_x64-setup.exe" \
-  "src-tauri/target/release/bundle/msi/GitScope_X.Y.Z_x64_en-US.msi" \
-  --title "GitScope vX.Y.Z" \
+  "src-tauri/target/release/bundle/nsis/Pepper_X.Y.Z_x64-setup.exe" \
+  "src-tauri/target/release/bundle/msi/Pepper_X.Y.Z_x64_en-US.msi" \
+  --title "Pepper vX.Y.Z" \
   --notes "..."
 ```
 
@@ -90,7 +90,7 @@ gh release create vX.Y.Z \
 - Tauri CLI 2.10.1 + @tauri-apps/api 2.10.1
 
 ### Phase 1+2 — Tauri 초기화 + Rust git CLI wrapper ✅
-- `src-tauri/` 생성, identifier `com.gitscope.app`, 1280×800 윈도우
+- `src-tauri/` 생성, identifier `com.pepper.app`, 1280×800 윈도우
 - Express 의존성 전면 제거 (`cors`, `express`, `simple-git`, `tsx`, `concurrently` 삭제, 197→74 패키지)
 - `src/server/` + `tsconfig.server.json` 삭제
 - `api.ts` fetch → `invoke` 전면 교체 (함수 시그니처는 유지 → 컴포넌트 수정 최소)
@@ -183,9 +183,9 @@ gh release create vX.Y.Z \
   - 외부 클릭 / Esc 로 닫힘, listbox/option role + aria-selected
   - 체크 아이콘으로 현재 테마 표시
 - `main.tsx`: React 렌더 전 initial theme 적용 (flash 방지)
-- localStorage `gitscope.theme` 에 선호 저장
+- localStorage `pepper.theme` 에 선호 저장
 
-### Phase 9-A/B — 심볼 단위 히스토리 (GitScope 원래 차별점) ✅
+### Phase 9-A/B — 심볼 단위 히스토리 (Pepper 원래 차별점) ✅
 일반 Git GUI에 없는 "함수/클래스 생애주기" 뷰.
 - Rust 크레이트: `tree-sitter 0.26`, `tree-sitter-typescript 0.23`, `tree-sitter-rust 0.24`
 - **`symbols.rs`** 신규 모듈:
@@ -311,7 +311,7 @@ dev 서버를 Claude Code의 `run_in_background`로 띄우면 몇 번 재실행 
 - `lib.rs`는 **entry + AppState 정의 + 커맨드 등록**만. 로직 X.
 - `git.rs`의 `with_repo` / `run_git` / `CommitInfo`(pub)는 `forensics.rs` / `stash.rs` / `symbols.rs` 에서 재사용.
 - `forensics.rs`의 `CachedScan`은 `pub`로 export → `lib.rs`의 AppState에서 `Mutex<Option<CachedScan>>`로 보유.
-- `recent.rs`: AppData 경로는 `dirs::config_dir()`, 파일 `GitScope/recent.json`. 존재하지 않는 경로는 읽을 때 자동 제거.
+- `recent.rs`: AppData 경로는 `dirs::config_dir()`, 파일 `Pepper/recent.json`. 존재하지 않는 경로는 읽을 때 자동 제거.
 - `stash.rs`: 모든 git 호출은 `git::run_git` 경유 → CMD 창 회피 플래그 자동 적용.
 - `symbols.rs`: Tree-sitter 파서 + 언어별 쿼리. `git log -L` 출력은 `COMMIT_SEP` 기반 자체 파서(`parse_symbol_log`)로 처리.
 
@@ -384,7 +384,7 @@ const ok = await confirm({
 2. `npm install` (필요 시)
 3. `npm run dev`로 창 뜨는지 확인
 4. 이 파일(DEVELOPMENT.md)을 Claude에게 읽히기:
-   > "GitScope 이어서 작업. DEVELOPMENT.md 읽어봐줘. Phase 8 (rebase/cherry-pick/reset) 부터 진행할거야."
+   > "Pepper 이어서 작업. DEVELOPMENT.md 읽어봐줘. Phase 8 (rebase/cherry-pick/reset) 부터 진행할거야."
 5. Phase 8 / 9-D / 스크린샷 중 택일
 
 ### v0.2.0 릴리즈 (권장)
@@ -393,9 +393,9 @@ Phase 7 + 9 내용이 충분히 minor bump 감. 언제든:
 # Cargo.toml / package.json / tauri.conf.json 의 version을 0.2.0 으로 변경
 npm run build
 gh release create v0.2.0 \
-  "src-tauri/target/release/bundle/nsis/GitScope_0.2.0_x64-setup.exe" \
-  "src-tauri/target/release/bundle/msi/GitScope_0.2.0_x64_en-US.msi" \
-  --title "GitScope v0.2.0" \
+  "src-tauri/target/release/bundle/nsis/Pepper_0.2.0_x64-setup.exe" \
+  "src-tauri/target/release/bundle/msi/Pepper_0.2.0_x64_en-US.msi" \
+  --title "Pepper v0.2.0" \
   --notes "Phase 7 (Forensics 진행률 + 테마 전환) + Phase 9 (심볼 단위 히스토리)"
 ```
 
@@ -403,6 +403,6 @@ gh release create v0.2.0 \
 
 ## 관련 링크
 
-- **GitHub 레포**: https://github.com/cho1124/GitScope
-- **Releases**: https://github.com/cho1124/GitScope/releases
-- **적대적 검증 문서**: https://github.com/cho1124/multi-agent-adversarial-verification/tree/master/docs/experiments/2026-04-20-GitScope-Verification
+- **GitHub 레포**: https://github.com/cho1124/Pepper
+- **Releases**: https://github.com/cho1124/Pepper/releases
+- **적대적 검증 문서**: https://github.com/cho1124/multi-agent-adversarial-verification/tree/master/docs/experiments/2026-04-20-Pepper-Verification

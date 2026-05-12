@@ -15,7 +15,12 @@ const MAX_RECENT: usize = 10;
 
 fn storage_path() -> Option<PathBuf> {
     dirs::config_dir().map(|base| {
-        let dir = base.join("GitScope");
+        let dir = base.join("Pepper");
+        // 리브랜딩 마이그레이션 — 과거 GitScope 디렉토리 있고 새 위치 없으면 한 번만 rename
+        let old = base.join("GitScope");
+        if old.exists() && !dir.exists() {
+            let _ = fs::rename(&old, &dir);
+        }
         let _ = fs::create_dir_all(&dir);
         dir.join("recent.json")
     })

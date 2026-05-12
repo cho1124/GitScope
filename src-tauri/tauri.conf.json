@@ -1,8 +1,8 @@
 {
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
-  "productName": "GitScope",
+  "productName": "Pepper",
   "version": "0.4.0",
-  "identifier": "com.gitscope.app",
+  "identifier": "dev.cho1124.pepper",
   "build": {
     "frontendDist": "../dist/client",
     "devUrl": "http://localhost:5173",
@@ -12,7 +12,7 @@
   "app": {
     "windows": [
       {
-        "title": "GitScope",
+        "title": "Pepper",
         "width": 1280,
         "height": 800,
         "minWidth": 900,

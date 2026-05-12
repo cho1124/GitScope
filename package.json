@@ -1,7 +1,7 @@
 {
-  "name": "gitscope",
+  "name": "pepper",
   "version": "0.4.0",
-  "description": "Git GUI with Code Forensics visualization",
+  "description": "Pepper — a friendly Git GUI with code forensics, symbol-level history, and on-device AI customization",
   "type": "module",
   "scripts": {
     "dev": "tauri dev",

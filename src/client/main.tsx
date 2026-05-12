@@ -7,6 +7,29 @@ import { applyTheme, getSavedTheme } from './components/ThemeSelector'
 import { initDisplaySettings } from './lib/displaySettings'
 import './global.css'
 
+// 리브랜딩 마이그레이션 — 과거 'gitscope.*' localStorage 키를 'pepper.*' 로 한 번만 옮김.
+// 사용자 설정(테마/사이드바 너비/날짜 포맷 등)이 reset 되지 않도록.
+function migrateLegacyKeys() {
+  try {
+    const OLD = 'gitscope.'
+    const NEW = 'pepper.'
+    const toMove: string[] = []
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i)
+      if (k && k.startsWith(OLD)) toMove.push(k)
+    }
+    for (const oldKey of toMove) {
+      const newKey = NEW + oldKey.slice(OLD.length)
+      const value = localStorage.getItem(oldKey)
+      if (value !== null && localStorage.getItem(newKey) === null) {
+        localStorage.setItem(newKey, value)
+      }
+      localStorage.removeItem(oldKey)
+    }
+  } catch { /* private mode 등 — 무시 */ }
+}
+migrateLegacyKeys()
+
 // 초기 테마 적용 — React 렌더 전에 실행해서 flash 방지 (built-in + custom 모두 처리)
 applyTheme(getSavedTheme())
 // 표시 옵션 (row padding) CSS 변수 초기 동기화

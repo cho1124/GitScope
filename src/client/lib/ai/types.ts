@@ -51,4 +51,6 @@ export interface ThemeAiProvider {
   generate(opts: GenerateOptions): Promise<ThemePalette>
   /** 기존 팔레트를 자연어로 수정 (선택 — Phase 11-C) */
   refine?(opts: RefineOptions): Promise<ThemePalette>
+  /** 자연어 → 배경 데코 설정 생성 (Phase 11-D-2) */
+  generateDecor?(opts: GenerateOptions): Promise<import('../decorSettings').DecorConfig>
 }

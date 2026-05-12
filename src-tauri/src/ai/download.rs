@@ -35,7 +35,7 @@ pub async fn download_to_file(
     on_progress: &Channel<DownloadProgress>,
 ) -> Result<u64, String> {
     let client = reqwest::Client::builder()
-        .user_agent("GitScope/0.4 (+https://github.com/cho1124/GitScope)")
+        .user_agent("Pepper/0.4 (+https://github.com/cho1124/Pepper)")
         .build()
         .map_err(|e| format!("HTTP 클라이언트 생성 실패: {}", e))?;
 

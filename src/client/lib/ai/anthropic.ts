@@ -5,11 +5,11 @@ import {
 } from './types'
 import { validatePaletteShape } from './validation'
 
-const API_KEY_STORAGE = 'gitscope.anthropicApiKey'
-const MODEL_STORAGE = 'gitscope.themeGenModel'
+const API_KEY_STORAGE = 'pepper.anthropicApiKey'
+const MODEL_STORAGE = 'pepper.themeGenModel'
 const DEFAULT_MODEL = 'claude-opus-4-7'
 
-const SYSTEM_PROMPT = `You are a UI theme designer for GitScope, a Git GUI desktop app.
+const SYSTEM_PROMPT = `You are a UI theme designer for Pepper, a Git GUI desktop app.
 
 Generate a Catppuccin-style 14-token palette based on the user's description. Output ONLY the JSON matching the schema. No prose.
 
@@ -44,7 +44,7 @@ const SCHEMA = {
 }
 
 export interface AnthropicProviderOptions {
-  /** 명시적 키 — 미지정 시 localStorage 의 'gitscope.anthropicApiKey' */
+  /** 명시적 키 — 미지정 시 localStorage 의 'pepper.anthropicApiKey' */
   apiKey?: string
   /** 명시적 모델 — 미지정 시 localStorage 또는 default */
   model?: string

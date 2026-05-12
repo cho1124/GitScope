@@ -55,7 +55,7 @@ const pillStyle: React.CSSProperties = {
 }
 
 const PAGE_SIZE = 100
-const INCLUDE_ALL_LS_KEY = 'gitscope.commitLog.includeAll'
+const INCLUDE_ALL_LS_KEY = 'pepper.commitLog.includeAll'
 
 interface CtxMenu {
   hash: string

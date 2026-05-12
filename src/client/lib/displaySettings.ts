@@ -3,8 +3,8 @@ import { useEffect, useState } from 'react'
 // ── 날짜 표시 모드 ─────────────────────────────────────────
 export type DateFormatMode = 'relative' | 'absolute'
 
-const DATE_FORMAT_LS_KEY = 'gitscope.dateFormat'
-const DATE_FORMAT_EVENT = 'gitscope:dateFormat-changed'
+const DATE_FORMAT_LS_KEY = 'pepper.dateFormat'
+const DATE_FORMAT_EVENT = 'pepper:dateFormat-changed'
 
 export function getDateFormat(): DateFormatMode {
   try {
@@ -42,8 +42,8 @@ export function useDateFormat(): DateFormatMode {
 }
 
 // ── 커밋 row 세로 여백 (px) ───────────────────────────────
-const ROW_PADDING_LS_KEY = 'gitscope.rowPaddingY'
-const ROW_PADDING_EVENT = 'gitscope:rowPaddingY-changed'
+const ROW_PADDING_LS_KEY = 'pepper.rowPaddingY'
+const ROW_PADDING_EVENT = 'pepper:rowPaddingY-changed'
 export const ROW_PADDING_MIN = 0
 export const ROW_PADDING_MAX = 12
 export const ROW_PADDING_DEFAULT = 0

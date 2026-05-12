@@ -13,6 +13,7 @@ import { WelcomeScreen } from './components/WelcomeScreen'
 import { RepoSelector } from './components/RepoSelector'
 import { RemoteSyncButton } from './components/RemoteSyncButton'
 import { SettingsModal } from './components/SettingsModal'
+import { BackgroundDecor } from './components/BackgroundDecor'
 import { WindowControls } from './components/WindowControls'
 import { onDragHandle } from './lib/dragRegion'
 import { useToast } from './components/Toast'
@@ -38,7 +39,7 @@ export default function App() {
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [sidebarWidth, setSidebarWidth] = useState<number>(() => {
     try {
-      const v = parseInt(localStorage.getItem('gitscope.sidebarWidth') ?? '260', 10)
+      const v = parseInt(localStorage.getItem('pepper.sidebarWidth') ?? '260', 10)
       return Number.isFinite(v) && v >= 180 && v <= 600 ? v : 260
     } catch { return 260 }
   })
@@ -108,7 +109,7 @@ export default function App() {
   }, [sidebarWidth])
 
   useEffect(() => {
-    try { localStorage.setItem('gitscope.sidebarWidth', String(sidebarWidth)) } catch {}
+    try { localStorage.setItem('pepper.sidebarWidth', String(sidebarWidth)) } catch {}
   }, [sidebarWidth])
 
   // 키보드 단축키 (Ctrl+1~3 탭 전환, F5 새로고침)
@@ -129,6 +130,7 @@ export default function App() {
   if (!repo) {
     return (
       <div className="app-container">
+        <BackgroundDecor />
         {/* data-tauri-drag-region 부착 X — Tauri 자동 핸들러가 closest()로
             부모를 찾기 때문에 자식 버튼에 "false" 줘도 부모 drag region 매치되어 충돌.
             onMouseDown(onDragHandle)만 사용하고 핸들러 내부에서 인터랙티브 자식 차단. */}
@@ -144,6 +146,7 @@ export default function App() {
 
   return (
     <div className="app-container">
+      <BackgroundDecor />
       <header className="app-header" style={{ gap: 8 }} onMouseDown={onDragHandle}>
         <Logo />
         <RepoSelector
@@ -328,7 +331,7 @@ function Logo() {
           fontFamily: 'var(--font-mono)',
         }}
       >
-        GitScope
+        Pepper
       </span>
     </div>
   )

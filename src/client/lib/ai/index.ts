@@ -27,7 +27,7 @@ export function getProvider(id: string): ThemeAiProvider | undefined {
   return PROVIDERS.find(p => p.id === id)
 }
 
-const SELECTED_STORAGE = 'gitscope.themeAiProvider'
+const SELECTED_STORAGE = 'pepper.themeAiProvider'
 
 export function getSelectedProviderId(): string {
   const saved = localStorage.getItem(SELECTED_STORAGE)

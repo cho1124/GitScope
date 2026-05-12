@@ -46,7 +46,7 @@ export function StatusBar({ branch, refreshKey }: Props) {
         </span>
       )}
       <div style={{ flex: 1 }} />
-      <span>GitScope v0.1.0</span>
+      <span>Pepper v0.4.0</span>
     </div>
   )
 }

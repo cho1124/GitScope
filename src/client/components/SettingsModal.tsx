@@ -16,6 +16,7 @@ import {
 } from '../lib/ai'
 import { ManualPaletteEditor } from './ManualPaletteEditor'
 import { LocalAiSettings } from './LocalAiSettings'
+import { AVAILABLE_ICON_NAMES } from './BackgroundDecor'
 import { useToast } from './Toast'
 import { useConfirm } from './ConfirmModal'
 import {
@@ -23,6 +24,11 @@ import {
   useRowPaddingY, setRowPaddingY,
   ROW_PADDING_MIN, ROW_PADDING_MAX, ROW_PADDING_DEFAULT,
 } from '../lib/displaySettings'
+import {
+  useDecorConfig, setDecorConfig,
+  DENSITY_MIN, DENSITY_MAX, OPACITY_MIN, OPACITY_MAX, SIZE_MIN, SIZE_MAX,
+  type IconSet, type SpeedLevel, type ColorSource, type DriftMode,
+} from '../lib/decorSettings'
 
 interface Props {
   onClose: () => void
@@ -55,6 +61,7 @@ export function SettingsModal({ onClose }: Props) {
   const [customThemes, setCustomThemes] = useState<CustomTheme[]>([])
   const dateFormat = useDateFormat()
   const rowPaddingY = useRowPaddingY()
+  const decor = useDecorConfig()
 
   // provider 상태
   const providers = listProviders()
@@ -73,6 +80,10 @@ export function SettingsModal({ onClose }: Props) {
   const [editor, setEditor] = useState<EditorState>({ mode: 'closed', initial: null })
   // 편집/AI 미리보기 시작 직전의 테마 (취소 시 복원)
   const [previewStash, setPreviewStash] = useState<Theme | null>(null)
+
+  // 데코 AI 생성 상태
+  const [decorPrompt, setDecorPrompt] = useState('')
+  const [decorBusy, setDecorBusy] = useState(false)
 
   useEffect(() => { setCustomThemes(getCustomThemes()) }, [])
 
@@ -221,6 +232,35 @@ export function SettingsModal({ onClose }: Props) {
     setEditor({ mode: 'closed', initial: null })
     setPreviewStash(null)
     setTheme(getSavedTheme())
+  }
+
+  const handleGenerateDecor = async () => {
+    const trimmed = decorPrompt.trim()
+    if (!trimmed) {
+      toast.error('데코 설명을 입력하세요')
+      return
+    }
+    const provider = getProvider(providerId)
+    if (!provider?.generateDecor) {
+      toast.error(`${provider?.label ?? '현재 provider'}는 데코 생성을 지원하지 않습니다`)
+      return
+    }
+    const status = await provider.isAvailable()
+    if (!status.ok) {
+      toast.error(`${provider.label} 사용 불가: ${status.reason}`)
+      return
+    }
+    setDecorBusy(true)
+    try {
+      const result = await provider.generateDecor({ prompt: trimmed })
+      setDecorConfig({ ...result, enabled: true })
+      toast.success(`데코 적용 — ${result.iconSet} · ${result.density}개 · ${result.drift}`)
+      setDecorPrompt('')
+    } catch (e) {
+      toast.error(`데코 생성 실패: ${e instanceof Error ? e.message : String(e)}`)
+    } finally {
+      setDecorBusy(false)
+    }
   }
 
   const handleCopyJson = (target: ThemePalette | CustomTheme) => {
@@ -385,6 +425,183 @@ export function SettingsModal({ onClose }: Props) {
               />
               <Hint>커밋 리스트 한 행의 위/아래 여백. 그래프 라인 높이도 함께 늘어납니다.</Hint>
             </div>
+          </div>
+        </Section>
+
+        {/* 배경 데코 */}
+        <Section title="배경 데코">
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            <label style={{ display: 'inline-flex', alignItems: 'center', gap: 6, cursor: 'pointer', userSelect: 'none', fontSize: 12 }}>
+              <input
+                type="checkbox"
+                checked={decor.enabled}
+                onChange={e => setDecorConfig({ enabled: e.target.checked })}
+              />
+              <span>배경에 떠다니는 아이콘 표시</span>
+            </label>
+
+            {/* AI 자연어 → 데코 설정 (Phase 11-D-2) */}
+            <div>
+              <Label>AI 로 생성 (자연어)</Label>
+              <div style={{ display: 'flex', gap: 4 }}>
+                <input
+                  type="text"
+                  value={decorPrompt}
+                  onChange={e => setDecorPrompt(e.target.value)}
+                  onKeyDown={e => { if (e.key === 'Enter' && !decorBusy) handleGenerateDecor() }}
+                  placeholder="예: 코드가 비처럼 떨어지는 분위기"
+                  disabled={decorBusy}
+                  style={{ flex: 1, fontSize: 11, padding: '4px 6px' }}
+                />
+                <button
+                  type="button"
+                  className="btn btn-sm"
+                  onClick={handleGenerateDecor}
+                  disabled={decorBusy || !decorPrompt.trim()}
+                  style={{
+                    display: 'inline-flex', alignItems: 'center', gap: 4,
+                    background: 'var(--mauve)', color: 'var(--bg-primary)', borderColor: 'var(--mauve)',
+                    fontSize: 11, padding: '4px 10px',
+                  }}
+                >
+                  {decorBusy ? (
+                    <><span className="spinner" style={{ width: 10, height: 10, borderWidth: 1 }} /> 생성</>
+                  ) : (
+                    <><Sparkles size={11} /> 생성</>
+                  )}
+                </button>
+              </div>
+              <Hint>현재 AI provider 가 자연어를 8개 항목 JSON 으로 변환 → 즉시 적용 + 토글 자동 ON.</Hint>
+            </div>
+
+            {decor.enabled && (
+              <>
+                <div>
+                  <Label>아이콘 종류</Label>
+                  <select
+                    value={decor.iconSet}
+                    onChange={e => setDecorConfig({ iconSet: e.target.value as IconSet })}
+                    style={{ width: '100%', fontSize: 11, padding: '4px 6px' }}
+                  >
+                    <option value="git">Git (브랜치/커밋/머지/체리/태그…)</option>
+                    <option value="code">Code (대괄호/터미널/Cpu/Bug…)</option>
+                    <option value="minimal">Minimal (원/사각/삼각형…)</option>
+                    <option value="fun">Fun (고양이/강아지/별/하트…)</option>
+                    <option value="custom">Custom (직접 지정)</option>
+                    <option value="none">없음</option>
+                  </select>
+                </div>
+
+                {decor.iconSet === 'custom' && (
+                  <div>
+                    <Label>커스텀 아이콘 — 쉼표로 구분</Label>
+                    <input
+                      type="text"
+                      value={decor.customIcons.join(', ')}
+                      onChange={e => setDecorConfig({
+                        customIcons: e.target.value.split(',').map(s => s.trim()).filter(Boolean),
+                      })}
+                      placeholder="Cat, PawPrint, Heart"
+                      style={{ width: '100%', fontSize: 11, padding: '4px 6px', fontFamily: 'var(--font-mono)' }}
+                    />
+                    <Hint>
+                      사용 가능: {AVAILABLE_ICON_NAMES.join(', ')}
+                    </Hint>
+                  </div>
+                )}
+
+                <div>
+                  <Label>
+                    농도 (동시 표시 개수) — <span style={{ fontFamily: 'var(--font-mono)', color: 'var(--accent)' }}>{decor.density}</span>
+                  </Label>
+                  <input
+                    type="range"
+                    min={DENSITY_MIN}
+                    max={DENSITY_MAX}
+                    step={1}
+                    value={decor.density}
+                    onChange={e => setDecorConfig({ density: parseInt(e.target.value, 10) })}
+                    style={{ width: '100%' }}
+                  />
+                </div>
+
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <div style={{ flex: 1 }}>
+                    <Label>속도</Label>
+                    <select
+                      value={decor.speed}
+                      onChange={e => setDecorConfig({ speed: e.target.value as SpeedLevel })}
+                      style={{ width: '100%', fontSize: 11, padding: '4px 6px' }}
+                    >
+                      <option value="slow">느림 (60~120초)</option>
+                      <option value="medium">보통 (25~50초)</option>
+                      <option value="fast">빠름 (10~20초)</option>
+                    </select>
+                  </div>
+                  <div style={{ flex: 1 }}>
+                    <Label>방향</Label>
+                    <select
+                      value={decor.drift}
+                      onChange={e => setDecorConfig({ drift: e.target.value as DriftMode })}
+                      style={{ width: '100%', fontSize: 11, padding: '4px 6px' }}
+                    >
+                      <option value="all">자유 (제자리 떠다님)</option>
+                      <option value="up">위로 (아래 → 위)</option>
+                      <option value="down">아래로 (위 → 아래)</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div>
+                  <Label>
+                    불투명도 — <span style={{ fontFamily: 'var(--font-mono)', color: 'var(--accent)' }}>{decor.opacity.toFixed(2)}</span>
+                  </Label>
+                  <input
+                    type="range"
+                    min={OPACITY_MIN}
+                    max={OPACITY_MAX}
+                    step={0.01}
+                    value={decor.opacity}
+                    onChange={e => setDecorConfig({ opacity: parseFloat(e.target.value) })}
+                    style={{ width: '100%' }}
+                  />
+                </div>
+
+                <div>
+                  <Label>
+                    크기 — <span style={{ fontFamily: 'var(--font-mono)', color: 'var(--accent)' }}>{decor.size}px</span>
+                  </Label>
+                  <input
+                    type="range"
+                    min={SIZE_MIN}
+                    max={SIZE_MAX}
+                    step={1}
+                    value={decor.size}
+                    onChange={e => setDecorConfig({ size: parseInt(e.target.value, 10) })}
+                    style={{ width: '100%' }}
+                  />
+                </div>
+
+                <div>
+                  <Label>색상</Label>
+                  <select
+                    value={decor.color}
+                    onChange={e => setDecorConfig({ color: e.target.value as ColorSource })}
+                    style={{ width: '100%', fontSize: 11, padding: '4px 6px' }}
+                  >
+                    <option value="auto">자동 (테마 accent)</option>
+                    <option value="accent">Accent</option>
+                    <option value="mauve">Mauve</option>
+                    <option value="green">Green</option>
+                    <option value="peach">Peach</option>
+                    <option value="yellow">Yellow</option>
+                    <option value="red">Red</option>
+                  </select>
+                </div>
+
+                <Hint>Phase 11-D-2 에서 자연어 → 데코 설정 자동 생성 추가 예정.</Hint>
+              </>
+            )}
           </div>
         </Section>
 

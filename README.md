@@ -1,4 +1,4 @@
-# GitScope
+# Pepper
 
 Code Forensics 시각화와 **심볼 단위 히스토리**를 내장한 **로컬 데스크톱 Git GUI** (Tauri 기반).
 
@@ -9,13 +9,13 @@ Code Forensics 시각화와 **심볼 단위 히스토리**를 내장한 **로컬
 
 ## 다운로드
 
-**[최신 릴리즈 → v0.4.0](https://github.com/cho1124/GitScope/releases/latest)**  
+**[최신 릴리즈 → v0.4.0](https://github.com/cho1124/Pepper/releases/latest)**  
 (AI 테마 생성기 · 헤더 리디자인 · 커스텀 타이틀 바)
 
 | 파일 | 크기 | 설명 |
 |------|------|------|
-| `GitScope_x.y.z_x64-setup.exe` | ~2 MB | NSIS 설치 (권장) |
-| `GitScope_x.y.z_x64_en-US.msi` | ~3 MB | MSI 설치 (기업 배포용) |
+| `Pepper_x.y.z_x64-setup.exe` | ~2 MB | NSIS 설치 (권장) |
+| `Pepper_x.y.z_x64_en-US.msi` | ~3 MB | MSI 설치 (기업 배포용) |
 
 > ⚠ 코드 서명이 없어 Windows SmartScreen 경고가 뜹니다.
 > "추가 정보" → "실행"을 클릭하면 설치됩니다.
@@ -34,7 +34,7 @@ Code Forensics 시각화와 **심볼 단위 히스토리**를 내장한 **로컬
 | **태그 표시** | 커밋 로그에 HEAD/브랜치/리모트/태그 pill 분리 |
 
 ### 심볼 단위 히스토리 (차별점) ⭐
-일반 Git GUI는 파일 단위 추적만 가능. GitScope는 **Tree-sitter + `git log -L`** 로 **함수/클래스/메서드 단위 히스토리**를 제공합니다.
+일반 Git GUI는 파일 단위 추적만 가능. Pepper는 **Tree-sitter + `git log -L`** 로 **함수/클래스/메서드 단위 히스토리**를 제공합니다.
 
 | 지원 언어 | 탐지 심볼 |
 |---|---|
@@ -46,7 +46,7 @@ Code Forensics 시각화와 **심볼 단위 히스토리**를 내장한 **로컬
 파일 히스토리 탭에서 심볼을 고르면 **그 심볼이 변경된 커밋만** 필터링됩니다. 리팩토링 히스토리 추적, 특정 함수의 의도 변화 파악, 인수인계에 유용합니다.
 
 ### AI 테마 생성기 (v0.4.0 신규) 🆕
-자연어 한 줄로 GitScope 전용 팔레트를 생성합니다. **`ThemeAiProvider`** 추상화로 BYOK(Anthropic API)와 추후 로컬 LLM(llama.cpp + Gemma GGUF)을 같은 인터페이스로 다룹니다.
+자연어 한 줄로 Pepper 전용 팔레트를 생성합니다. **`ThemeAiProvider`** 추상화로 BYOK(Anthropic API)와 추후 로컬 LLM(llama.cpp + Gemma GGUF)을 같은 인터페이스로 다룹니다.
 
 | 기능 | 설명 |
 |------|------|
@@ -119,8 +119,8 @@ Linear / Discord 스타일의 통합 헤더. `decorations: false` 윈도우에 *
 
 ### 설치
 ```bash
-git clone https://github.com/cho1124/GitScope.git
-cd GitScope
+git clone https://github.com/cho1124/Pepper.git
+cd Pepper
 npm install
 ```
 
@@ -155,7 +155,7 @@ npm run build
 ## 프로젝트 구조
 
 ```
-GitScope/
+Pepper/
 ├── src-tauri/                       # Rust 백엔드
 │   ├── src/
 │   │   ├── main.rs                 # entry
@@ -213,23 +213,23 @@ GitScope/
 
 ## Code Forensics란?
 
-기존 Git GUI는 커밋 로그와 Diff만 보여줍니다. GitScope는 **코드 변경 패턴을 분석**하여 추가 인사이트를 제공합니다.
+기존 Git GUI는 커밋 로그와 Diff만 보여줍니다. Pepper는 **코드 변경 패턴을 분석**하여 추가 인사이트를 제공합니다.
 
 - **히트맵**: "어떤 파일이 가장 자주 바뀌는가?" → 불안정한 코드 식별
 - **핫스팟**: 변경 빈도 × 기여자 수 × 최근 활동도 → 리팩토링 우선순위
 - **트렌드**: "프로젝트의 변경 속도가 빨라지고 있는가?" → 개발 추이 파악
 - **기여자**: "누가 어떤 코드를 주로 관리하는가?" → 코드 오너십 시각화
 
-여기에 **심볼 단위 히스토리** (GitScope 고유)로 "이 함수는 왜 이렇게 복잡해졌지?"를 커밋 단위로 추적할 수 있습니다.
+여기에 **심볼 단위 히스토리** (Pepper 고유)로 "이 함수는 왜 이렇게 복잡해졌지?"를 커밋 단위로 추적할 수 있습니다.
 
 유사 도구:
 - **CodeScene** — SaaS, 유료, 커뮤니티 에디션 2023년 종료
 - **Code Maat** — CLI 전용, 시각화 없음
-- **GitScope** — 무료 + 로컬 + 시각화 + Git GUI 통합 + **심볼 단위 히스토리**
+- **Pepper** — 무료 + 로컬 + 시각화 + Git GUI 통합 + **심볼 단위 히스토리**
 
 ## 로컬 디자인 엔진 방향
 
-GitScope의 AI 기능은 일반 챗봇을 붙이는 방향보다 **로컬 디자인 엔진 내장**으로 가져간다. 목표는 테마 커스터마이징을 앱의 고유 기능으로 만드는 것이며, 외부 서비스 의존 없이 로컬 모델이 Git GUI용 팔레트를 생성하고 수정하도록 한다.
+Pepper의 AI 기능은 일반 챗봇을 붙이는 방향보다 **로컬 디자인 엔진 내장**으로 가져간다. 목표는 테마 커스터마이징을 앱의 고유 기능으로 만드는 것이며, 외부 서비스 의존 없이 로컬 모델이 Git GUI용 팔레트를 생성하고 수정하도록 한다.
 
 ### 핵심 판단
 - **Ollama 의존은 피한다.** 설치/실행/model pull을 사용자에게 맡기면 앱 내장 기능이라기보다 외부 연동처럼 보인다.
@@ -280,7 +280,7 @@ SettingsModal
    - "GitHub Dark 느낌으로"
 
 ### 포지셔닝
-이 기능은 "AI 챗봇 내장"이 아니라 **GitScope Local Design Engine**으로 표현한다. GitScope가 코드 히스토리와 Forensics를 로컬에서 분석하듯, 테마 디자인도 로컬 모델이 앱 내부에서 생성/수정하는 구조가 제품 정체성과 잘 맞는다.
+이 기능은 "AI 챗봇 내장"이 아니라 **Pepper Local Design Engine**으로 표현한다. Pepper가 코드 히스토리와 Forensics를 로컬에서 분석하듯, 테마 디자인도 로컬 모델이 앱 내부에서 생성/수정하는 구조가 제품 정체성과 잘 맞는다.
 ## 개발 진행 상황
 
 | Phase | 범위 | 상태 |

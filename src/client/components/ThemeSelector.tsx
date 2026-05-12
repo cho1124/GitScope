@@ -14,8 +14,8 @@ export const builtinThemes: { id: BuiltinTheme; label: string; preview: string }
   { id: 'macchiato', label: 'Macchiato', preview: '#24273a' },
 ]
 
-const STORAGE_KEY = 'gitscope.theme'
-const CUSTOM_STORAGE_KEY = 'gitscope.customThemes'
+const STORAGE_KEY = 'pepper.theme'
+const CUSTOM_STORAGE_KEY = 'pepper.customThemes'
 
 function isBuiltinTheme(v: unknown): v is BuiltinTheme {
   return v === 'mocha' || v === 'latte' || v === 'frappe' || v === 'macchiato'

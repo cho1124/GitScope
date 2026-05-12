@@ -184,6 +184,23 @@ body {
   flex-shrink: 0;
 }
 
+/* ── 배경 데코 애니메이션 (Phase 11-D) ──────────── */
+@keyframes decor-drift-all {
+  0%   { transform: translate(0, 0) rotate(var(--decor-rotate-base, 0deg)); }
+  25%  { transform: translate(30px, -40px) rotate(calc(var(--decor-rotate-base, 0deg) + 90deg)); }
+  50%  { transform: translate(-25px, -80px) rotate(calc(var(--decor-rotate-base, 0deg) + 180deg)); }
+  75%  { transform: translate(40px, -50px) rotate(calc(var(--decor-rotate-base, 0deg) + 270deg)); }
+  100% { transform: translate(0, 0) rotate(calc(var(--decor-rotate-base, 0deg) + 360deg)); }
+}
+@keyframes decor-drift-up {
+  0%   { transform: translate(0, 100vh) rotate(var(--decor-rotate-base, 0deg)); }
+  100% { transform: translate(20px, -10vh) rotate(calc(var(--decor-rotate-base, 0deg) + 360deg)); }
+}
+@keyframes decor-drift-down {
+  0%   { transform: translate(0, -10vh) rotate(var(--decor-rotate-base, 0deg)); }
+  100% { transform: translate(20px, 100vh) rotate(calc(var(--decor-rotate-base, 0deg) + 360deg)); }
+}
+
 /* 드래그로 사이드바 너비 조정하는 핸들 */
 .sidebar-resizer {
   width: 4px;

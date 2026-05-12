@@ -1,6 +1,6 @@
 use serde::Serialize;
 
-/// GitScope 가 지원하는 GGUF 모델 카탈로그.
+/// Pepper 가 지원하는 GGUF 모델 카탈로그.
 ///
 /// 새 모델 추가 시 여기에 항목 추가하면 프론트엔드 SettingsModal 에 자동 노출.
 #[derive(Debug, Clone, Serialize)]

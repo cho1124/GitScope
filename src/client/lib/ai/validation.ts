@@ -1,4 +1,8 @@
 import { TOKEN_KEYS, SEMANTIC_TOKENS, type TokenKey, type TokenMap, type ThemePalette } from './types'
+import {
+  DENSITY_MIN, DENSITY_MAX, OPACITY_MIN, OPACITY_MAX, SIZE_MIN, SIZE_MAX,
+  type DecorConfig, type IconSet, type SpeedLevel, type ColorSource, type DriftMode,
+} from '../decorSettings'
 
 const HEX_RE = /^#[0-9a-fA-F]{6}$/
 
@@ -165,3 +169,59 @@ export function auditPalette(palette: ThemePalette): PaletteWarning[] {
 }
 
 export const HEX_REGEX = HEX_RE
+
+// ─── 배경 데코 검증 (Phase 11-D-2) ────────────────
+
+const ICON_SETS_VALID: IconSet[] = ['git', 'code', 'minimal', 'fun', 'custom', 'none']
+const SPEED_VALID: SpeedLevel[] = ['slow', 'medium', 'fast']
+const COLOR_VALID: ColorSource[] = ['auto', 'accent', 'mauve', 'green', 'peach', 'yellow', 'red']
+const DRIFT_VALID: DriftMode[] = ['all', 'up', 'down']
+
+function clamp(v: number, min: number, max: number): number {
+  return Math.max(min, Math.min(max, v))
+}
+
+/**
+ * AI 가 뱉은 데코 설정 JSON 을 안전한 DecorConfig 로 정규화.
+ * - 누락 필드는 throw 하지 않고 합리적 기본값으로 fallback (AI 가 일부만 채워도 부드럽게 적용)
+ * - 범위 벗어난 숫자는 clamp
+ * - enum 위반은 fallback
+ */
+export function validateDecorShape(data: unknown): DecorConfig {
+  if (!data || typeof data !== 'object') throw new Error('객체가 아닙니다')
+  const obj = data as Record<string, unknown>
+
+  const iconSet = ICON_SETS_VALID.includes(obj.iconSet as IconSet)
+    ? (obj.iconSet as IconSet)
+    : 'git'
+  const speed = SPEED_VALID.includes(obj.speed as SpeedLevel)
+    ? (obj.speed as SpeedLevel)
+    : 'slow'
+  const color = COLOR_VALID.includes(obj.color as ColorSource)
+    ? (obj.color as ColorSource)
+    : 'auto'
+  const drift = DRIFT_VALID.includes(obj.drift as DriftMode)
+    ? (obj.drift as DriftMode)
+    : 'all'
+
+  const density = typeof obj.density === 'number' && Number.isFinite(obj.density)
+    ? clamp(Math.round(obj.density), DENSITY_MIN, DENSITY_MAX)
+    : 12
+  const opacity = typeof obj.opacity === 'number' && Number.isFinite(obj.opacity)
+    ? clamp(obj.opacity, OPACITY_MIN, OPACITY_MAX)
+    : 0.08
+  const size = typeof obj.size === 'number' && Number.isFinite(obj.size)
+    ? clamp(Math.round(obj.size), SIZE_MIN, SIZE_MAX)
+    : 18
+
+  const enabled = typeof obj.enabled === 'boolean' ? obj.enabled : true
+
+  const customIcons = Array.isArray(obj.customIcons)
+    ? (obj.customIcons as unknown[])
+        .filter((s): s is string => typeof s === 'string' && s.trim().length > 0)
+        .map(s => s.trim())
+        .slice(0, 30)
+    : []
+
+  return { enabled, iconSet, density, speed, opacity, size, color, drift, customIcons }
+}
